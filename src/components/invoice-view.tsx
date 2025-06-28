@@ -55,7 +55,7 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
   return (
     <Card className="print-container w-full rounded-xl shadow-lg bg-white">
       <CardHeader className="p-4 sm:p-6 md:p-8">
-        <div className="flex flex-col sm:flex-row justify-between gap-6">
+        <div className="flex justify-between items-start gap-4">
           <div>
             <div className="no-print">
               <Logo />
