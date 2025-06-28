@@ -16,23 +16,22 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Enable offline persistence
-try {
-    enableIndexedDbPersistence(db)
-      .catch((err) => {
-        if (err.code == 'failed-precondition') {
-            // Multiple tabs open, persistence can only be enabled
-            // in one tab at a time.
-            console.warn('Firestore offline persistence failed: Multiple tabs open.');
-        } else if (err.code == 'unimplemented') {
-            // The current browser does not support all of the
-            // features required to enable persistence
-            console.warn('Firestore offline persistence is not supported in this browser.');
-        }
-    });
-} catch (err) {
-    console.error("Error enabling Firestore persistence:", err);
-}
-
+// Enable offline persistence.
+// This must be called before any other Firestore operations.
+// It allows the app to work with cached data when offline.
+enableIndexedDbPersistence(db)
+  .catch((err) => {
+    if (err.code === 'failed-precondition') {
+        // This can happen if you have multiple tabs open, as persistence can only be
+        // enabled in one tab at a time. The app will still function offline in the
+        // primary tab.
+        console.warn('Firestore offline persistence failed: Multiple tabs open.');
+    } else if (err.code === 'unimplemented') {
+        // The current browser does not support all of the features required to enable persistence.
+        console.warn('Firestore offline persistence is not supported in this browser.');
+    } else {
+        console.error("Error enabling Firestore persistence:", err);
+    }
+});
 
 export { db, auth };
