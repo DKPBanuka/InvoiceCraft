@@ -1,0 +1,67 @@
+
+"use client";
+
+import Logo from '../logo';
+import { cn } from '@/lib/utils';
+import { WifiOff, LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useOnlineStatus } from '@/hooks/use-online-status';
+import { useAuth } from '@/contexts/auth-context';
+import { Badge } from '@/components/ui/badge';
+import { SidebarTrigger } from '../ui/sidebar';
+import Link from 'next/link';
+
+function SyncStatus() {
+  const isOnline = useOnlineStatus();
+
+  return (
+    <div className="flex items-center gap-1.5 text-sm font-medium">
+    {isOnline ? (
+        <>
+        <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-accent/80"></span>
+        </span>
+        <span className="hidden sm:inline text-accent-foreground">Online</span>
+        </>
+    ) : (
+        <>
+        <WifiOff className="h-4 w-4 text-muted-foreground" />
+        <span className="hidden sm:inline text-muted-foreground">Offline</span>
+        </>
+    )}
+    </div>
+  )
+}
+
+
+export default function AppHeader() {
+  const { user, isLoading, signOut } = useAuth();
+  
+  return (
+    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 no-print">
+      <div className="container flex h-16 items-center">
+        <div className="flex items-center md:hidden">
+            <SidebarTrigger />
+        </div>
+        <div className="flex items-center gap-4 ml-auto">
+            {!isLoading && user && (
+                <>
+                <SyncStatus />
+                <div className="text-xs text-muted-foreground hidden sm:block">
+                    |
+                </div>
+                <div className="hidden sm:flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">{user.username}</p>
+                    <Badge variant="outline" className="uppercase text-xs">{user.role}</Badge>
+                </div>
+                 <Button variant="ghost" size="icon" onClick={signOut}>
+                    <LogOut className="h-5 w-5" />
+                </Button>
+                </>
+            )}
+        </div>
+      </div>
+    </header>
+  );
+}
