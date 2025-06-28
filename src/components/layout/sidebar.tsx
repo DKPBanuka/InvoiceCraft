@@ -4,7 +4,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { cn } from '@/lib/utils';
 import { 
     Sidebar,
     SidebarHeader,
@@ -60,6 +59,20 @@ export default function AppSidebar() {
                 ))}
             </SidebarMenu>
         </SidebarContent>
+
+        {/* Desktop Footer */}
+        <SidebarFooter className="hidden md:flex border-t">
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton onClick={signOut} tooltip={{children: "Logout"}}>
+                        <LogOut />
+                        <span>Logout</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+        </SidebarFooter>
+        
+        {/* Mobile Footer */}
         <SidebarFooter className="md:hidden flex flex-col gap-4 border-t pt-4">
              <div className="flex items-center gap-2 px-2">
                 <p className="text-sm font-medium">{user.username}</p>
