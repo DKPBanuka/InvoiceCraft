@@ -59,7 +59,11 @@ export default function InvoiceDetailPage() {
         document.title = originalTitle;
     }, { once: true });
 
-    window.print();
+    // Use a short timeout to ensure the title update is processed before the print dialog opens,
+    // which can help with inconsistencies in mobile browsers.
+    setTimeout(() => {
+        window.print();
+    }, 100);
   };
 
 
