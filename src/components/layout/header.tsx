@@ -3,7 +3,7 @@
 
 import Logo from '../logo';
 import { cn } from '@/lib/utils';
-import { WifiOff, LogOut } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { useAuth } from '@/contexts/auth-context';
@@ -15,7 +15,7 @@ function SyncStatus() {
   const isOnline = useOnlineStatus();
 
   return (
-    <div className="flex items-center gap-1.5 text-sm font-medium">
+    <div className="flex items-center gap-1.5 text-base font-medium">
     {isOnline ? (
         <>
         <span className="relative flex h-2 w-2">
@@ -48,16 +48,13 @@ export default function AppHeader() {
             {!isLoading && user && (
                 <>
                 <SyncStatus />
-                <div className="text-xs text-muted-foreground hidden sm:block">
+                <div className="text-sm text-muted-foreground hidden sm:block">
                     |
                 </div>
                 <div className="hidden sm:flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground">{user.username}</p>
-                    <Badge variant="outline" className="uppercase text-xs">{user.role}</Badge>
+                    <p className="text-base text-muted-foreground">{user.username}</p>
+                    <Badge variant="outline" className="uppercase text-sm">{user.role}</Badge>
                 </div>
-                 <Button variant="ghost" size="icon" onClick={signOut}>
-                    <LogOut className="h-5 w-5" />
-                </Button>
                 </>
             )}
         </div>

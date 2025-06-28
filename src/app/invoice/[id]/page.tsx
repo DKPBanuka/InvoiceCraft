@@ -47,6 +47,18 @@ export default function InvoiceDetailPage() {
   }, [id, getInvoice, isLoading, router]);
   
   const handlePrint = () => {
+    if (!invoice) return;
+
+    const originalTitle = document.title;
+    const newTitle = `${invoice.customerName.replace(/\s+/g, '_')}_${invoice.id}`;
+    document.title = newTitle;
+
+    // This event fires after the user prints or cancels the print dialog.
+    // The { once: true } option ensures the listener is automatically removed after firing.
+    window.addEventListener('afterprint', () => {
+        document.title = originalTitle;
+    }, { once: true });
+
     window.print();
   };
 
