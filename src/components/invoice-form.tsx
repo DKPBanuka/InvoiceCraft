@@ -240,6 +240,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
             ...invoice,
             customerPhone: invoice.customerPhone || '',
             discount: invoice.discount || 0,
+            // Ensure status is only "Paid" or "Unpaid"
+            status: invoice.status === "Paid" || invoice.status === "Unpaid" ? invoice.status : "Unpaid",
           }
         : {
             customerName: '',
@@ -275,6 +277,10 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     const invoiceData = {
       ...values,
       status: values.status as 'Paid' | 'Unpaid',
+      lineItems: values.lineItems.map((item, idx) => ({
+        ...item,
+        id: item.id ?? `${idx}-${Date.now()}`
+      })),
     };
 
     if (isEditMode && invoice) {
