@@ -67,7 +67,7 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
                 <p>0756438091</p>
             </div>
           </div>
-          <div className="text-left sm:text-right">
+          <div className="text-right">
             <h2 className="text-3xl font-bold font-headline text-primary">INVOICE</h2>
             <p className="text-muted-foreground mt-1">{invoice.id}</p>
              <Badge className={cn(
