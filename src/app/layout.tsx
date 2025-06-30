@@ -7,7 +7,7 @@ import { AuthProvider } from '@/contexts/auth-context';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import { ChatProvider } from '../contexts/chat-context';
+import { ChatProvider } from '@/contexts/chat-context';
 
 export const metadata: Metadata = {
   title: 'InvoiceCraft',
@@ -28,6 +28,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#2081e2" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="InvoiceCraft" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
