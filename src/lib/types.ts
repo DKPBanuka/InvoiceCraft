@@ -97,7 +97,4 @@ export interface Message {
   senderName: string;
   text: string;
   createdAt: any; // server timestamp
-  fileUrl?: string;
-  fileName?: string;
-  fileType?: string;
 }

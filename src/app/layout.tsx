@@ -7,7 +7,7 @@ import { AuthProvider } from '@/contexts/auth-context';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import { ChatProvider } from '@/contexts/chat-context';
+import { ChatProvider } from '../contexts/chat-context';
 
 export const metadata: Metadata = {
   title: 'InvoiceCraft',

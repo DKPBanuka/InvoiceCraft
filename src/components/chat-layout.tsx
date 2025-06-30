@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { NewChatDialog } from './new-chat-dailog';
-import { Loader2, Paperclip, Send, File as FileIcon, Download, Users, MessageSquare, Plus, ArrowLeft } from 'lucide-react';
+import { NewChatDialog } from './new-chat-dialog';
+import { Loader2, Send, Users, MessageSquare, Plus, ArrowLeft } from 'lucide-react';
 import type { Conversation, Message } from '@/lib/types';
 import { format, isToday, isYesterday } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -128,14 +128,12 @@ function ChatWindow({
   otherUsername: string | undefined;
   messages: Message[];
   isLoadingMessages: boolean;
-  sendMessage: (conversationId: string, text: string, file: File | null) => Promise<void>;
+  sendMessage: (conversationId: string, text: string) => Promise<void>;
   onBack: () => void;
 }) {
   const { user } = useAuth();
   const [text, setText] = useState('');
-  const [file, setFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const messagesWithSeparators = useMemo(() => {
@@ -165,50 +163,13 @@ function ChatWindow({
   }, [messagesWithSeparators]);
 
   const handleSend = async () => {
-    if ((!text.trim() && !file) || isSending) return;
+    if (!text.trim() || isSending) return;
     setIsSending(true);
-    await sendMessage(conversationId, text, file);
+    await sendMessage(conversationId, text);
     setText('');
-    setFile(null);
-    if(fileInputRef.current) fileInputRef.current.value = "";
     setIsSending(false);
   };
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
-  };
-
-  const renderFileMessage = (message: Message) => {
-    if (!message.fileUrl || !message.fileType) return null;
-    
-    if (message.fileType.startsWith('image/')) {
-        return (
-            <a
-                href={message.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 block"
-                title={message.fileName || 'Open image attachment'}
-            >
-                <Image src={message.fileUrl} alt={message.fileName || 'Image attachment'} width={200} height={200} className="rounded-lg object-cover" />
-            </a>
-        )
-    }
-
-    return (
-        <a href={message.fileUrl} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center gap-2 rounded-lg border bg-secondary p-2 hover:bg-secondary/80">
-            <FileIcon className="h-6 w-6 flex-shrink-0" />
-            <div className="truncate">
-                <p className="truncate text-sm font-medium">{message.fileName}</p>
-                <p className="text-xs text-muted-foreground">Click to download</p>
-            </div>
-            <Download className="ml-auto h-5 w-5 flex-shrink-0" />
-        </a>
-    )
-  }
-
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b p-4">
@@ -254,7 +215,6 @@ function ChatWindow({
                                 )}
                             >
                             <p className="whitespace-pre-wrap">{message.text}</p>
-                            {message.fileUrl && renderFileMessage(message)}
                             <p className="mt-1 text-right text-xs opacity-70">
                                 {message.createdAt ? format(message.createdAt.toDate(), 'p') : ''}
                             </p>
@@ -274,7 +234,7 @@ function ChatWindow({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Type a message..."
-            className="pr-20"
+            className="pr-12"
             onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -283,38 +243,11 @@ function ChatWindow({
             }}
           />
           <div className="absolute bottom-2 right-2 flex items-center gap-1">
-             <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                id="file-upload"
-                aria-label="Attach file"
-            />
-            <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => fileInputRef.current?.click()}
-            >
-                <Paperclip className="h-5 w-5" />
-                <span className="sr-only">Attach file</span>
-            </Button>
             <Button type="button" size="icon" onClick={handleSend} disabled={isSending}>
               {isSending ? <Loader2 className="h-5 w-5 animate-spin"/> : <Send className="h-5 w-5" />}
             </Button>
           </div>
         </div>
-        {file && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                <FileIcon className="h-4 w-4" />
-                <span>{file.name}</span>
-                <button onClick={() => {
-                    setFile(null);
-                    if(fileInputRef.current) fileInputRef.current.value = "";
-                }} className="text-destructive font-bold ml-2">x</button>
-            </div>
-        )}
       </footer>
     </div>
   );
@@ -348,8 +281,8 @@ export default function ChatLayout() {
       }
   }
 
-  const selectedConversation = conversations.find((c: Conversation) => c.id === selectedConversationId);
-  const otherParticipantId = selectedConversation?.participants.find((p: string) => p !== user?.uid);
+  const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+  const otherParticipantId = selectedConversation?.participants.find(p => p !== user?.uid);
   const otherUsername = otherParticipantId ? selectedConversation?.participantUsernames[otherParticipantId] : undefined;
   
   const availableUsers = users.filter(u => u.uid !== user?.uid);

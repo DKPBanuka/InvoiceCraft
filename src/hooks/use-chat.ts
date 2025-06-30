@@ -20,8 +20,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import type { Conversation, Message, AuthUser } from '@/lib/types';
 import { useToast } from './use-toast';
-// Update the import path below if the actual file location is different
-import { useChatContext } from '../contexts/chat-context';
+import { useChatContext } from '@/contexts/chat-context';
 
 export function useChat() {
   const { user } = useAuth();
