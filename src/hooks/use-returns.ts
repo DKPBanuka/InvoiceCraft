@@ -7,11 +7,13 @@ import type { ReturnItem } from '@/lib/types';
 import { useInventory } from './use-inventory';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, query, orderBy, limit, getDocs, where, writeBatch } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 
 
 const RETURNS_COLLECTION = 'returns';
+const USERS_COLLECTION = 'users';
+const NOTIFICATIONS_COLLECTION = 'notifications';
 
 export function useReturns() {
   const [returns, setReturns] = useState<ReturnItem[]>([]);
@@ -102,11 +104,24 @@ export function useReturns() {
           createdBy: user.uid,
           createdByName: user.username || 'N/A'
         };
-
-        await addDoc(collection(db, RETURNS_COLLECTION), {
-          ...newReturn,
-          createdAt: serverTimestamp(),
+        
+        const batch = writeBatch(db);
+        const newReturnRef = doc(collection(db, RETURNS_COLLECTION));
+        batch.set(newReturnRef, { ...newReturn, createdAt: serverTimestamp() });
+        
+        const message = `${user.username} created a new return ${newReturnId}.`;
+        const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', 'in', ['admin', 'staff'])));
+        usersSnapshot.docs.forEach(userDoc => {
+          if (userDoc.id !== user.uid) {
+              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(notificationRef, {
+                  recipientUid: userDoc.id, senderName: user.username, message,
+                  link: `/returns/${newReturnRef.id}`, read: false, createdAt: serverTimestamp(), type: 'return'
+              });
+          }
         });
+
+        await batch.commit();
         
         toast({
           title: "Return Logged",
@@ -128,12 +143,21 @@ export function useReturns() {
     const returnItem = returns.find(r => r.id === id);
     if (!returnItem) return;
     
-    if (user?.role !== 'admin') {
+    if (!user || !['admin', 'staff'].includes(user.role)) {
         toast({ title: "Permission Denied", description: "You are not authorized to update returns.", variant: "destructive"});
+        return;
+    }
+    
+    // Staff can only update notes, not status
+    if (user.role === 'staff' && updatedData.status && updatedData.status !== returnItem.status) {
+        toast({ title: "Permission Denied", description: "Only admins can change the return status.", variant: "destructive"});
         return;
     }
 
     try {
+      const batch = writeBatch(db);
+      const returnDocRef = doc(db, RETURNS_COLLECTION, id);
+
       const isClosing = updatedData.status === 'Completed / Closed';
       const updatePayload: any = { ...updatedData };
 
@@ -141,8 +165,30 @@ export function useReturns() {
         updatePayload.resolutionDate = serverTimestamp();
       }
 
-      const returnDocRef = doc(db, RETURNS_COLLECTION, id);
-      await updateDoc(returnDocRef, updatePayload);
+      batch.update(returnDocRef, updatePayload);
+
+      // --- START: Notification Logic ---
+      const message = `${user.username} updated return ${returnItem.returnId}.`;
+      const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', 'in', ['admin', 'staff'])));
+      
+      usersSnapshot.docs.forEach(userDoc => {
+          // Notify all admins and staff, except the person who made the change
+          if (userDoc.id !== user.uid) {
+              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(notificationRef, {
+                  recipientUid: userDoc.id,
+                  senderName: user.username,
+                  message: message,
+                  link: `/returns/${id}`,
+                  read: false,
+                  createdAt: serverTimestamp(),
+                  type: 'return'
+              });
+          }
+      });
+      // --- END: Notification Logic ---
+
+      await batch.commit();
 
       toast({
         title: "Return Updated",

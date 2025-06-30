@@ -68,3 +68,36 @@ export interface ReturnItem {
   createdBy: string; // User UID
   createdByName: string;
 }
+
+export interface AppNotification {
+  id: string;
+  message: string;
+  link: string;
+  read: boolean;
+  recipientUid: string;
+  createdAt: string; // ISO string
+  senderName: string;
+  type: 'invoice' | 'inventory' | 'return' | 'general';
+}
+
+export interface Conversation {
+  id: string;
+  participants: string[]; // array of user uids
+  participantUsernames: { [key: string]: string };
+  lastMessage?: string;
+  lastMessageTimestamp?: any; // server timestamp
+  lastMessageSenderId?: string;
+  unreadCounts: { [key: string]: number };
+}
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  createdAt: any; // server timestamp
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+}

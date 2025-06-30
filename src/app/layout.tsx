@@ -1,4 +1,3 @@
-// app/layout.tsx
 
 import type { Metadata } from 'next';
 import './globals.css';
@@ -8,21 +7,16 @@ import { AuthProvider } from '@/contexts/auth-context';
 import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { ChatProvider } from '@/contexts/chat-context';
 
 export const metadata: Metadata = {
   title: 'InvoiceCraft',
   description: 'Create, manage, and store invoices with ease.',
-  manifest: '/manifest.json',
-  themeColor: '#2081e2', // Correctly placed here
-  icons: {
-    apple: [
-      { 
-        url: '/apple-touch-icon.png', // Assuming you will add this to your /public folder
-        sizes: '180x180',
-        type: 'image/png'
-      }
-    ]
-  },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+  }
 };
 
 export default function RootLayout({
@@ -33,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Manual metadata tags are removed. Only resource links remain. */}
+        <meta name="theme-color" content="#2081e2" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -47,14 +41,16 @@ export default function RootLayout({
         )}
       >
         <AuthProvider>
-            <SidebarProvider>
-                <AppSidebar />
-                <SidebarInset>
-                    <AppHeader />
-                    <main>{children}</main>
-                </SidebarInset>
-                <Toaster />
-            </SidebarProvider>
+            <ChatProvider>
+              <SidebarProvider>
+                  <AppSidebar />
+                  <SidebarInset>
+                      <AppHeader />
+                      <main>{children}</main>
+                  </SidebarInset>
+                  <Toaster />
+              </SidebarProvider>
+            </ChatProvider>
         </AuthProvider>
       </body>
     </html>

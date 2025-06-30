@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/auth-context';
 
 const INVOICES_COLLECTION = 'invoices';
 const INVENTORY_COLLECTION = 'inventory';
+const USERS_COLLECTION = 'users';
+const NOTIFICATIONS_COLLECTION = 'notifications';
 
 export function useInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -105,6 +107,20 @@ export function useInvoices() {
               batch.update(itemDocRef, { quantity: increment(-lineItem.quantity) });
           }
       });
+      
+      // 3. Notify Admins
+      const message = `${user.username} created a new invoice ${invoiceId} for ${newInvoiceData.customerName}.`;
+      const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
+      usersSnapshot.docs.forEach(userDoc => {
+          if (userDoc.id !== user.uid) {
+              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(notificationRef, {
+                  recipientUid: userDoc.id, senderName: user.username, message,
+                  link: `/invoice/${invoiceId}`, read: false, createdAt: serverTimestamp(), type: 'invoice'
+              });
+          }
+      });
+
 
       await batch.commit();
 
@@ -166,6 +182,19 @@ export function useInvoices() {
       };
       batch.update(invoiceDocRef, finalUpdateData as any);
 
+       // Notify Admins
+      const message = `${user.username} updated invoice ${id}.`;
+      const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
+      usersSnapshot.docs.forEach(userDoc => {
+          if (userDoc.id !== user.uid) {
+              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(notificationRef, {
+                  recipientUid: userDoc.id, senderName: user.username, message,
+                  link: `/invoice/${id}`, read: false, createdAt: serverTimestamp(), type: 'invoice'
+              });
+          }
+      });
+
       await batch.commit();
 
       toast({
@@ -200,6 +229,19 @@ export function useInvoices() {
             const itemDocRef = doc(db, INVENTORY_COLLECTION, lineItem.inventoryItemId);
             batch.update(itemDocRef, { quantity: increment(lineItem.quantity) });
         }
+        });
+
+        // 3. Notify Admins
+        const message = `${user.username} cancelled invoice ${id}.`;
+        const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
+        usersSnapshot.docs.forEach(userDoc => {
+            if (userDoc.id !== user.uid) {
+                const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+                batch.set(notificationRef, {
+                    recipientUid: userDoc.id, senderName: user.username, message,
+                    link: `/invoice/${id}`, read: false, createdAt: serverTimestamp(), type: 'invoice'
+                });
+            }
         });
 
         await batch.commit();

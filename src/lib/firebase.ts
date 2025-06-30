@@ -1,6 +1,8 @@
+
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDj0UfT40Q2YZzRCbQitVlrLUR_lQiopfQ",
@@ -15,6 +17,7 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
 // Enable offline persistence.
 // This must be called before any other Firestore operations.
@@ -34,4 +37,4 @@ enableIndexedDbPersistence(db)
     }
 });
 
-export { db, auth };
+export { db, auth, storage };

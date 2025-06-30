@@ -4,7 +4,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Loader2, ChevronsUpDown, Wand2, Percent } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronsUpDown, Wand2, Percent, Contact } from 'lucide-react';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -180,6 +180,13 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const { inventory } = useInventory();
   const { user } = useAuth();
   const isEditMode = !!invoice;
+  const [isContactPickerSupported, setIsContactPickerSupported] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window) {
+      setIsContactPickerSupported(true);
+    }
+  }, []);
 
   const formSchema = useMemo(() => {
     return z.object({
@@ -237,11 +244,18 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: isEditMode
         ? {
-            ...invoice,
+            customerName: invoice.customerName,
             customerPhone: invoice.customerPhone || '',
+            status: invoice.status === 'Paid' ? 'Paid' : 'Unpaid',
+            lineItems: invoice.lineItems.map(item => ({
+              id: item.id,
+              inventoryItemId: item.inventoryItemId,
+              description: item.description,
+              quantity: item.quantity,
+              price: item.price,
+              warrantyPeriod: item.warrantyPeriod,
+            })),
             discount: invoice.discount || 0,
-            // Ensure status is only "Paid" or "Unpaid"
-            status: invoice.status === "Paid" || invoice.status === "Unpaid" ? invoice.status : "Unpaid",
           }
         : {
             customerName: '',
@@ -273,13 +287,26 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const discountAmount = subtotal * ((Number(watchDiscount) || 0) / 100);
   const totalAmount = subtotal - discountAmount;
 
+  const handleSelectContact = async () => {
+    if (!isContactPickerSupported) return;
+    try {
+        const contacts = await (navigator as any).contacts.select(['tel'], { multiple: false });
+        if (contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
+            form.setValue('customerPhone', contacts[0].tel[0], { shouldValidate: true });
+        }
+    } catch (ex) {
+        console.log("Contact Picker was closed or failed."); // User might cancel, which is fine.
+    }
+  };
+
+
   function onSubmit(values: InvoiceFormData) {
     const invoiceData = {
       ...values,
       status: values.status as 'Paid' | 'Unpaid',
-      lineItems: values.lineItems.map((item, idx) => ({
+      lineItems: values.lineItems.map(item => ({
         ...item,
-        id: item.id ?? `${idx}-${Date.now()}`
+        id: item.id ?? '', // Ensure id is always a string
       })),
     };
 
@@ -315,9 +342,27 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Customer Phone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. 0771234567" {...field} />
-                    </FormControl>
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. 0771234567"
+                          {...field}
+                          className={isContactPickerSupported ? 'pr-12' : ''}
+                        />
+                      </FormControl>
+                      {isContactPickerSupported && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute inset-y-0 right-0 h-full"
+                          onClick={handleSelectContact}
+                          aria-label="Select from contacts"
+                        >
+                          <Contact className="h-5 w-5 text-muted-foreground" />
+                        </Button>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

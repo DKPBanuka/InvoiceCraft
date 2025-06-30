@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, Archive, Search, LineChart } from 'lucide-react';
+import { Plus, Archive, Search, LineChart, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useInventory } from '@/hooks/use-inventory';
 import InventoryList from '@/components/inventory-list';
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select";
 import type { ItemStatus } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
+import { format } from 'date-fns';
+import { exportToCsv } from '@/lib/utils';
 
 export default function InventoryPage() {
   const { inventory, isLoading: inventoryLoading, deleteInventoryItem } = useInventory();
@@ -26,6 +28,11 @@ export default function InventoryPage() {
   const [statusFilter, setStatusFilter] = useState<ItemStatus | 'All'>('All');
 
   const isLoading = inventoryLoading || authLoading;
+
+  const { totalItemTypes, totalStockQuantity } = useMemo(() => {
+    const totalStock = inventory.reduce((sum, item) => sum + item.quantity, 0);
+    return { totalItemTypes: inventory.length, totalStockQuantity: totalStock };
+  }, [inventory]);
 
   const filteredInventory = useMemo(() => {
     return inventory.filter(
@@ -36,6 +43,42 @@ export default function InventoryPage() {
       }
     );
   }, [inventory, searchTerm, statusFilter]);
+
+  const handleExport = () => {
+    const dataToExport = filteredInventory.map(item => {
+        const baseData: any = {
+            id: item.id,
+            name: item.name,
+            status: item.status,
+            price: item.price.toFixed(2),
+            quantity: item.quantity,
+            reorderPoint: item.reorderPoint,
+            createdAt: format(new Date(item.createdAt), 'yyyy-MM-dd')
+        };
+        if (user?.role === 'admin') {
+            baseData.costPrice = item.costPrice.toFixed(2);
+            baseData.stockValue = (item.costPrice * item.quantity).toFixed(2);
+        }
+        return baseData;
+    });
+
+    const headers: any = {
+        id: 'Item ID',
+        name: 'Item Name',
+        status: 'Status',
+        price: 'Selling Price (Rs.)',
+        quantity: 'Stock Quantity',
+        reorderPoint: 'Reorder Point',
+        createdAt: 'Created Date'
+    };
+
+    if (user?.role === 'admin') {
+        headers.costPrice = 'Cost Price (Rs.)';
+        headers.stockValue = 'Stock Value (Cost) (Rs.)';
+    }
+
+    exportToCsv(dataToExport, `inventory-${new Date().toISOString().split('T')[0]}`, headers);
+  };
 
   if (isLoading) {
       return (
@@ -58,10 +101,14 @@ export default function InventoryPage() {
             Inventory
           </h1>
           <p className="text-muted-foreground">
-            Manage your item stock and prices.
+            {totalItemTypes} total item types, with {totalStockQuantity} units in stock.
           </p>
         </div>
         <div className="flex gap-2">
+            <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+            </Button>
             {user?.role === 'admin' && (
                 <Link href="/reports" passHref>
                     <Button variant="outline">

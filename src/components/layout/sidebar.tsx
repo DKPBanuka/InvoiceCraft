@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
+import { useChatContext } from '@/contexts/chat-context';
 import { 
     Sidebar,
     SidebarHeader,
@@ -14,18 +15,20 @@ import {
     SidebarFooter
 } from '@/components/ui/sidebar';
 import Logo from '../logo';
-import { Archive, FileText, LineChart, Undo2, Users, LogOut } from 'lucide-react';
+import { Archive, FileText, LineChart, Undo2, Users, LogOut, MessageSquare } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const { totalUnreadCount } = useChatContext();
   
   const navItems = [
     { href: '/', label: 'Invoices', icon: FileText, roles: ['admin', 'staff'] },
     { href: '/inventory', label: 'Inventory', icon: Archive, roles: ['admin', 'staff'] },
     { href: '/returns', label: 'Returns', icon: Undo2, roles: ['admin', 'staff'] },
+    { href: '/messages', label: 'Messages', icon: MessageSquare, roles: ['admin', 'staff'] },
     { href: '/reports', label: 'Reports', icon: LineChart, roles: ['admin'] },
     { href: '/users', label: 'Users', icon: Users, roles: ['admin'] },
   ];
@@ -55,6 +58,14 @@ export default function AppSidebar() {
                                 <span>{item.label}</span>
                             </Link>
                         </SidebarMenuButton>
+                        {item.href === '/messages' && totalUnreadCount > 0 && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none group-data-[collapsible=icon]:right-1.5 group-data-[collapsible=icon]:top-1.5">
+                                <div className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                                </div>
+                            </div>
+                        )}
                     </SidebarMenuItem>
                 ))}
             </SidebarMenu>

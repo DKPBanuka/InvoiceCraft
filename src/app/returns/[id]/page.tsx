@@ -98,7 +98,8 @@ export default function ReturnDetailPage() {
   }
 
   const isClosed = item.status === 'Completed / Closed';
-  const canUpdate = user?.role === 'admin';
+  const canUpdate = user?.role === 'admin' || user?.role === 'staff';
+  const canUpdateStatus = user?.role === 'admin';
 
   return (
     <div className="container mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
@@ -165,7 +166,7 @@ export default function ReturnDetailPage() {
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>New Status</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isClosed || !canUpdate}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isClosed || !canUpdateStatus}>
                                         <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select a status" />
@@ -177,6 +178,7 @@ export default function ReturnDetailPage() {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {!canUpdateStatus && <p className="text-xs text-muted-foreground mt-2">Only Admins can change the status.</p>}
                                     <FormMessage />
                                 </FormItem>
                                 )}
@@ -210,7 +212,7 @@ export default function ReturnDetailPage() {
                                 )}
                             </Button>
                             {isClosed && <p className="text-xs text-center text-muted-foreground pt-2">This return is closed and cannot be modified.</p>}
-                            {!canUpdate && <p className="text-xs text-center text-muted-foreground pt-2">Only Admins can update return status.</p>}
+                            {!canUpdate && <p className="text-xs text-center text-muted-foreground pt-2">You do not have permission to update returns.</p>}
                         </form>
                     </Form>
                 </CardContent>

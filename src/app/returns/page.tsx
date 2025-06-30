@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, Archive, Search } from 'lucide-react';
+import { Plus, Archive, Search, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useReturns } from '@/hooks/use-returns';
 import ReturnList from '@/components/return-list';
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { format } from 'date-fns';
+import { exportToCsv } from '@/lib/utils';
 
 export default function ReturnsPage() {
   const { returns, isLoading } = useReturns();
@@ -53,6 +55,33 @@ export default function ReturnsPage() {
 
   const returnStatuses: ReturnStatus[] = ['Awaiting Inspection', 'Under Repair', 'Ready for Pickup', 'To be Replaced', 'To be Refunded', 'Return to Supplier', 'Completed / Closed'];
 
+  const handleExport = () => {
+    const dataToExport = filteredReturns.map(item => ({
+        returnId: item.returnId,
+        type: item.type,
+        status: item.status,
+        customerName: item.customerName,
+        inventoryItemName: item.inventoryItemName,
+        quantity: item.quantity,
+        originalInvoiceId: item.originalInvoiceId || 'N/A',
+        createdAt: format(new Date(item.createdAt), 'yyyy-MM-dd'),
+        resolutionDate: item.resolutionDate ? format(new Date(item.resolutionDate), 'yyyy-MM-dd') : 'N/A',
+    }));
+
+    const headers = {
+        returnId: 'Return ID',
+        type: 'Type',
+        status: 'Status',
+        customerName: 'Customer Name',
+        inventoryItemName: 'Item Name',
+        quantity: 'Quantity',
+        originalInvoiceId: 'Original Invoice #',
+        createdAt: 'Date Logged',
+        resolutionDate: 'Date Resolved',
+    };
+
+    exportToCsv(dataToExport, `returns-${new Date().toISOString().split('T')[0]}`, headers);
+  };
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -65,12 +94,18 @@ export default function ReturnsPage() {
             Handle customer and supplier returns.
           </p>
         </div>
-        <Link href="/returns/new" passHref>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Return
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+            </Button>
+            <Link href="/returns/new" passHref>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Return
+              </Button>
+            </Link>
+        </div>
       </div>
 
       {isLoading ? (

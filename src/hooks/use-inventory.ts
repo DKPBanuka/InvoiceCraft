@@ -5,10 +5,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import type { InventoryItem } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, increment, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 
 const INVENTORY_COLLECTION = 'inventory';
+const USERS_COLLECTION = 'users';
+const NOTIFICATIONS_COLLECTION = 'notifications';
 
 export function useInventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -57,10 +59,28 @@ export function useInventory() {
       return;
     }
     try {
-      await addDoc(collection(db, INVENTORY_COLLECTION), {
+      const batch = writeBatch(db);
+      const newDocRef = doc(collection(db, INVENTORY_COLLECTION));
+      
+      batch.set(newDocRef, {
         ...itemData,
         createdAt: serverTimestamp(),
       });
+      
+      const message = `${user.username} added a new item: ${itemData.name}.`;
+      const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
+      usersSnapshot.docs.forEach(userDoc => {
+          if (userDoc.id !== user.uid) {
+              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(notificationRef, {
+                  recipientUid: userDoc.id, senderName: user.username, message,
+                  link: `/inventory`, read: false, createdAt: serverTimestamp(), type: 'inventory'
+              });
+          }
+      });
+
+      await batch.commit();
+
       toast({
         title: "Item Added",
         description: `${itemData.name} has been added to inventory.`,
@@ -86,13 +106,28 @@ export function useInventory() {
     }
     const itemDocRef = doc(db, INVENTORY_COLLECTION, id);
     try {
+      const batch = writeBatch(db);
       const { addStock, ...restOfData } = updatedData;
       const updatePayload: any = { ...restOfData };
       if (addStock && addStock !== 0) {
         updatePayload.quantity = increment(addStock);
       }
       
-      await updateDoc(itemDocRef, updatePayload);
+      batch.update(itemDocRef, updatePayload);
+      
+      const message = `${user.username} updated item ${updatedData.name || 'details'}.`;
+      const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
+      usersSnapshot.docs.forEach(userDoc => {
+          if (userDoc.id !== user.uid) {
+              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(notificationRef, {
+                  recipientUid: userDoc.id, senderName: user.username, message,
+                  link: `/inventory/${id}/edit`, read: false, createdAt: serverTimestamp(), type: 'inventory'
+              });
+          }
+      });
+      
+      await batch.commit();
       
       toast({
         title: "Item Updated",
@@ -114,7 +149,23 @@ export function useInventory() {
     if (!itemToDelete) return;
 
     try {
-      await deleteDoc(doc(db, INVENTORY_COLLECTION, id));
+      const batch = writeBatch(db);
+      batch.delete(doc(db, INVENTORY_COLLECTION, id));
+      
+      const message = `${user.username} deleted item: ${itemToDelete.name}.`;
+      const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
+      usersSnapshot.docs.forEach(userDoc => {
+          if (userDoc.id !== user.uid) {
+              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(notificationRef, {
+                  recipientUid: userDoc.id, senderName: user.username, message,
+                  link: `/inventory`, read: false, createdAt: serverTimestamp(), type: 'inventory'
+              });
+          }
+      });
+
+      await batch.commit();
+
       toast({
         title: "Item Deleted",
         description: `Item '${itemToDelete.name}' has been deleted.`,

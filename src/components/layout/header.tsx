@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { SidebarTrigger } from '../ui/sidebar';
 import Link from 'next/link';
+import { NotificationBell } from '../notification-bell';
 
 function SyncStatus() {
   const isOnline = useOnlineStatus();
@@ -44,16 +45,17 @@ export default function AppHeader() {
         <div className="flex items-center md:hidden">
             <SidebarTrigger />
         </div>
-        <div className="flex items-center gap-4 ml-auto">
+        <div className="flex items-center gap-2 sm:gap-4 ml-auto">
             {!isLoading && user && (
                 <>
+                <NotificationBell />
                 <SyncStatus />
                 <div className="text-sm text-muted-foreground hidden sm:block">
                     |
                 </div>
                 <div className="hidden sm:flex items-center gap-2">
-                    <p className="text-base text-muted-foreground">{user.username}</p>
-                    <Badge variant="outline" className="uppercase text-sm">{user.role}</Badge>
+                    <p className="text-sm sm:text-base text-muted-foreground">{user.username}</p>
+                    <Badge variant="outline" className="uppercase text-xs sm:text-sm">{user.role}</Badge>
                 </div>
                 </>
             )}
