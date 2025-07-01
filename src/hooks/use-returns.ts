@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, query, orderBy, limit, getDocs, where, writeBatch } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import { returnServerSchema, updateReturnServerSchema } from '@/lib/schemas';
 
 
 const RETURNS_COLLECTION = 'returns';
@@ -114,6 +115,14 @@ export function useReturns() {
       toast({ title: "Error", description: "You must be logged in to log a return.", variant: "destructive" });
       return;
     }
+    
+    const validationResult = returnServerSchema.safeParse(returnData);
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+      toast({ title: "Invalid Return Data", description: errorMessage, variant: "destructive" });
+      return;
+    }
+
     const inventoryItem = inventory.find(i => i.id === returnData.inventoryItemId);
     if (!inventoryItem) {
         toast({ title: "Error", description: "Selected inventory item not found.", variant: "destructive" });
@@ -123,7 +132,7 @@ export function useReturns() {
     try {
         const newReturnId = await generateReturnId();
         const newReturn: Omit<ReturnItem, 'id'> = {
-          ...returnData,
+          ...validationResult.data,
           returnId: newReturnId,
           createdAt: new Date().toISOString(), // This will be replaced by serverTimestamp
           inventoryItemName: inventoryItem.name,
@@ -175,10 +184,16 @@ export function useReturns() {
         return;
     }
     
-    // Staff can only update notes, not status
     if (user.role === 'staff' && updatedData.status && updatedData.status !== returnItem.status) {
         toast({ title: "Permission Denied", description: "Only admins can change the return status.", variant: "destructive"});
         return;
+    }
+
+    const validationResult = updateReturnServerSchema.safeParse(updatedData);
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+      toast({ title: "Invalid Data", description: errorMessage, variant: "destructive" });
+      return;
     }
 
     try {
@@ -186,7 +201,7 @@ export function useReturns() {
       const returnDocRef = doc(db, RETURNS_COLLECTION, id);
 
       const isClosing = updatedData.status === 'Completed / Closed';
-      const updatePayload: any = { ...updatedData };
+      const updatePayload: any = { ...validationResult.data };
 
       if (isClosing && !returnItem.resolutionDate) {
         updatePayload.resolutionDate = serverTimestamp();
@@ -194,12 +209,10 @@ export function useReturns() {
 
       batch.update(returnDocRef, updatePayload);
 
-      // --- START: Notification Logic ---
       const message = `${user.username} updated return ${returnItem.returnId}.`;
       const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', 'in', ['admin', 'staff'])));
       
       usersSnapshot.docs.forEach(userDoc => {
-          // Notify all admins and staff, except the person who made the change
           if (userDoc.id !== user.uid) {
               const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
               batch.set(notificationRef, {
@@ -213,7 +226,6 @@ export function useReturns() {
               });
           }
       });
-      // --- END: Notification Logic ---
 
       await batch.commit();
 

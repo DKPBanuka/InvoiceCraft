@@ -7,6 +7,7 @@ import type { Customer } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import { customerServerSchema } from '@/lib/schemas';
 
 const CUSTOMERS_COLLECTION = 'customers';
 
@@ -63,9 +64,20 @@ export function useCustomers() {
   }, [toast, user]);
 
   const addCustomer = useCallback(async (customerData: Omit<Customer, 'id' | 'createdAt'>) => {
+    const validationResult = customerServerSchema.safeParse(customerData);
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+      toast({
+        title: "Invalid Customer Data",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await addDoc(collection(db, CUSTOMERS_COLLECTION), {
-        ...customerData,
+        ...validationResult.data,
         createdAt: serverTimestamp(),
       });
       toast({
@@ -83,9 +95,20 @@ export function useCustomers() {
   }, [customers]);
 
   const updateCustomer = useCallback(async (id: string, updatedData: Partial<Omit<Customer, 'id' | 'createdAt'>>) => {
+    const validationResult = customerServerSchema.partial().safeParse(updatedData);
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+      toast({
+        title: "Invalid Customer Data",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const customerDocRef = doc(db, CUSTOMERS_COLLECTION, id);
     try {
-      await updateDoc(customerDocRef, updatedData);
+      await updateDoc(customerDocRef, validationResult.data);
       toast({
         title: "Customer Updated",
         description: `Customer has been successfully updated.`,

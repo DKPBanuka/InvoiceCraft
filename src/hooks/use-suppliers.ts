@@ -7,6 +7,7 @@ import type { Supplier } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import { supplierServerSchema } from '@/lib/schemas';
 
 const SUPPLIERS_COLLECTION = 'suppliers';
 
@@ -63,9 +64,20 @@ export function useSuppliers() {
   }, [toast, user]);
 
   const addSupplier = useCallback(async (supplierData: Omit<Supplier, 'id' | 'createdAt'>) => {
+    const validationResult = supplierServerSchema.safeParse(supplierData);
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+      toast({
+        title: "Invalid Supplier Data",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       await addDoc(collection(db, SUPPLIERS_COLLECTION), {
-        ...supplierData,
+        ...validationResult.data,
         createdAt: serverTimestamp(),
       });
       toast({
@@ -83,9 +95,20 @@ export function useSuppliers() {
   }, [suppliers]);
 
   const updateSupplier = useCallback(async (id: string, updatedData: Partial<Omit<Supplier, 'id' | 'createdAt'>>) => {
+    const validationResult = supplierServerSchema.partial().safeParse(updatedData);
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+      toast({
+        title: "Invalid Supplier Data",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const supplierDocRef = doc(db, SUPPLIERS_COLLECTION, id);
     try {
-      await updateDoc(supplierDocRef, updatedData);
+      await updateDoc(supplierDocRef, validationResult.data);
       toast({
         title: "Supplier Updated",
         description: `Supplier has been successfully updated.`,

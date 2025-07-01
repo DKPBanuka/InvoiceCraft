@@ -7,6 +7,8 @@ import type { InventoryItem } from '@/lib/types';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, increment, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import { inventoryItemServerSchema } from '@/lib/schemas';
+import * as z from 'zod';
 
 const INVENTORY_COLLECTION = 'inventory';
 const USERS_COLLECTION = 'users';
@@ -73,12 +75,25 @@ export function useInventory() {
       toast({ title: "Permission Denied", description: "You do not have permission to add items.", variant: "destructive" });
       return;
     }
+    
+    const { quantity, ...dataToValidate } = itemData;
+    const validationResult = inventoryItemServerSchema.safeParse(dataToValidate);
+    const quantityValidation = z.coerce.number().int().optional().safeParse(quantity);
+
+    if (!validationResult.success || !quantityValidation.success) {
+        const errors = validationResult.success ? [] : validationResult.error.errors.map(e => e.message);
+        if (!quantityValidation.success) errors.push("Initial quantity must be a whole number.");
+        toast({ title: "Invalid Data", description: errors.join('\n'), variant: "destructive" });
+        return;
+    }
+
     try {
       const batch = writeBatch(db);
       const newDocRef = doc(collection(db, INVENTORY_COLLECTION));
       
       batch.set(newDocRef, {
-        ...itemData,
+        ...validationResult.data,
+        quantity: quantity || 0,
         createdAt: serverTimestamp(),
       });
       
@@ -119,6 +134,18 @@ export function useInventory() {
       toast({ title: "Permission Denied", description: "You do not have permission to update items.", variant: "destructive" });
       return;
     }
+
+    const { addStock, ...restOfData } = updatedData;
+    const validationResult = inventoryItemServerSchema.partial().safeParse(restOfData);
+    const addStockValidation = z.coerce.number().int().optional().safeParse(addStock);
+
+    if (!validationResult.success || !addStockValidation.success) {
+        const errors = validationResult.success ? [] : validationResult.error.errors.map(e => e.message);
+        if(!addStockValidation.success) errors.push("Stock to add must be a whole number.");
+        toast({ title: "Invalid Data", description: errors.join('\n'), variant: "destructive" });
+        return;
+    }
+
     const itemDocRef = doc(db, INVENTORY_COLLECTION, id);
     try {
       const batch = writeBatch(db);
@@ -130,8 +157,7 @@ export function useInventory() {
       }
       const currentItemData = itemSnap.data() as InventoryItem;
 
-      const { addStock, ...restOfData } = updatedData;
-      const updatePayload: any = { ...restOfData };
+      const updatePayload: any = { ...validationResult.data };
       
       if (addStock && addStock !== 0) {
         updatePayload.quantity = increment(addStock);

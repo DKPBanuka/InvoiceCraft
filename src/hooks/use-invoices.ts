@@ -8,6 +8,7 @@ import type { Invoice, InvoiceStatus, Payment, InventoryItem } from '@/lib/types
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, writeBatch, query, orderBy, limit, getDocs, increment, where, arrayUnion, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
+import { invoiceServerSchema, paymentServerSchema } from '@/lib/schemas';
 
 const INVOICES_COLLECTION = 'invoices';
 const INVENTORY_COLLECTION = 'inventory';
@@ -24,12 +25,6 @@ const calculatePaid = (invoice: Pick<Invoice, 'payments'>): number => {
     return invoice.payments?.reduce((acc, p) => acc + p.amount, 0) || 0;
 };
 
-/**
- * Recursively removes keys with `undefined` values from an object or array.
- * This is crucial for preparing data for Firestore, which does not support `undefined`.
- * @param obj The object or array to clean.
- * @returns A new object or array with `undefined` values removed.
- */
 function cleanDataForFirebase(obj: any): any {
     if (Array.isArray(obj)) {
         return obj.map(v => cleanDataForFirebase(v));
@@ -130,68 +125,76 @@ export function useInvoices() {
       return;
     }
 
+    const { initialPayment, status, ...dataToValidate } = newInvoiceData;
+    const validationResult = invoiceServerSchema.safeParse(dataToValidate);
+
+    if (!validationResult.success) {
+        const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+        toast({ title: "Invalid Invoice Data", description: errorMessage, variant: "destructive" });
+        return;
+    }
+    
+    const totalAmount = calculateTotal(newInvoiceData);
+    if (status === 'Partially Paid') {
+        if (!initialPayment || initialPayment <= 0 || initialPayment >= totalAmount) {
+            toast({ title: "Invalid Payment", description: "For partially paid invoices, the payment must be greater than zero and less than the total.", variant: "destructive" });
+            return;
+        }
+    }
+
     try {
-      const invoiceId = await generateInvoiceNumber();
       const batch = writeBatch(db);
       
-      const finalInvoiceData = { ...newInvoiceData };
+      for (const lineItem of validationResult.data.lineItems) {
+        if (lineItem.type === 'product' && lineItem.inventoryItemId) {
+            const itemDocRef = doc(db, INVENTORY_COLLECTION, lineItem.inventoryItemId);
+            const itemSnap = await getDoc(itemDocRef);
+            if (!itemSnap.exists() || itemSnap.data().quantity < lineItem.quantity) {
+                toast({
+                    title: "Stock Unavailable",
+                    description: `Not enough stock for ${lineItem.description}. Only ${itemSnap.data()?.quantity || 0} available.`,
+                    variant: "destructive"
+                });
+                return;
+            }
+        }
+      }
 
-      // Initialize payments array
+      const invoiceId = await generateInvoiceNumber();
+      const finalInvoiceData = { ...newInvoiceData };
       finalInvoiceData.payments = [];
 
-      // If status is 'Paid', automatically add a full payment record.
       if (finalInvoiceData.status === 'Paid') {
-        const totalAmount = calculateTotal(finalInvoiceData);
         const payment: Payment = {
-          id: crypto.randomUUID(),
-          amount: totalAmount,
-          date: new Date().toISOString(),
-          method: 'Cash', // You can make this selectable later
-          notes: 'Initial full payment on creation.',
-          createdBy: user.uid,
-          createdByName: user.username,
+          id: crypto.randomUUID(), amount: totalAmount, date: new Date().toISOString(), method: 'Cash',
+          notes: 'Initial full payment on creation.', createdBy: user.uid, createdByName: user.username,
         };
         finalInvoiceData.payments = [payment];
       } else if (finalInvoiceData.status === 'Partially Paid' && finalInvoiceData.initialPayment && finalInvoiceData.initialPayment > 0) {
-        // Handle partial payment
         const payment: Payment = {
-          id: crypto.randomUUID(),
-          amount: finalInvoiceData.initialPayment,
-          date: new Date().toISOString(),
-          method: 'Cash', // You can make this selectable later
-          notes: 'Initial partial payment on creation.',
-          createdBy: user.uid,
-          createdByName: user.username,
+          id: crypto.randomUUID(), amount: finalInvoiceData.initialPayment, date: new Date().toISOString(), method: 'Cash',
+          notes: 'Initial partial payment on creation.', createdBy: user.uid, createdByName: user.username,
         };
         finalInvoiceData.payments = [payment];
       }
 
-      // 1. Create Invoice after cleaning it of undefined values
-      const { initialPayment, ...invoiceToSave } = finalInvoiceData;
+      const { initialPayment: removed, ...invoiceToSave } = finalInvoiceData;
       const invoiceDocRef = doc(db, INVOICES_COLLECTION, invoiceId);
       const cleanedData = cleanDataForFirebase({
-        ...invoiceToSave,
-        id: invoiceId,
-        createdAt: serverTimestamp(),
+        ...invoiceToSave, id: invoiceId, createdAt: serverTimestamp(),
         lineItems: newInvoiceData.lineItems.map(item => ({...item, id: item.id || crypto.randomUUID()})),
-        createdBy: user.uid,
-        createdByName: user.username,
+        createdBy: user.uid, createdByName: user.username,
       });
 
       batch.set(invoiceDocRef, cleanedData);
 
-      // 2. Update inventory stock and check for low stock
       for (const lineItem of newInvoiceData.lineItems) {
         if (lineItem.inventoryItemId) {
             const itemDocRef = doc(db, INVENTORY_COLLECTION, lineItem.inventoryItemId);
-            
-            // Fetch item data to check stock level *before* decrementing
             const itemSnap = await getDoc(itemDocRef);
             if (itemSnap.exists()) {
                 const itemData = itemSnap.data() as InventoryItem;
                 const newQuantity = itemData.quantity - lineItem.quantity;
-                
-                // If stock level crosses the reorder point, send notification
                 if (newQuantity <= itemData.reorderPoint && itemData.quantity > itemData.reorderPoint) {
                     const message = `Low stock alert: ${itemData.name} has only ${newQuantity} items left.`;
                     const adminsSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
@@ -208,7 +211,6 @@ export function useInvoices() {
         }
       }
       
-      // 3. Notify Admins about the new invoice
       const message = `${user.username} created a new invoice ${invoiceId} for ${newInvoiceData.customerName}.`;
       const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
       usersSnapshot.docs.forEach(userDoc => {
@@ -221,13 +223,8 @@ export function useInvoices() {
           }
       });
 
-
       await batch.commit();
-
-      toast({
-        title: "Invoice Created",
-        description: `Invoice ${invoiceId} has been successfully created.`,
-      });
+      toast({ title: "Invoice Created", description: `Invoice ${invoiceId} has been successfully created.` });
       router.push('/invoices');
     } catch (error) {
       console.error("Error creating invoice:", error);
@@ -247,52 +244,49 @@ export function useInvoices() {
     const originalInvoice = invoices.find(inv => inv.id === id);
     if (!originalInvoice) return;
 
+    const validationResult = invoiceServerSchema.partial().safeParse(updatedData);
+    if (!validationResult.success) {
+        const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+        toast({ title: "Invalid Invoice Data", description: errorMessage, variant: "destructive" });
+        return;
+    }
+
     try {
       const batch = writeBatch(db);
       const invoiceDocRef = doc(db, INVOICES_COLLECTION, id);
 
       const stockAdjustments = new Map<string, number>();
-
-      // Add back original quantities
       originalInvoice.lineItems.forEach(item => {
           if (item.inventoryItemId) {
               stockAdjustments.set(item.inventoryItemId, (stockAdjustments.get(item.inventoryItemId) || 0) + item.quantity);
           }
       });
-      
-      // Subtract new quantities
       updatedData.lineItems?.forEach(item => {
           if (item.inventoryItemId) {
               stockAdjustments.set(item.inventoryItemId, (stockAdjustments.get(item.inventoryItemId) || 0) - item.quantity);
           }
       });
       
-      // Apply stock adjustments to batch and check for low stock
       for (const [itemId, quantityChange] of stockAdjustments.entries()) {
           if (quantityChange !== 0) {
               const itemDocRef = doc(db, INVENTORY_COLLECTION, itemId);
-
-              // Low stock check only when stock decreases (negative change)
-              if (quantityChange < 0) {
-                  const itemSnap = await getDoc(itemDocRef);
-                  if (itemSnap.exists()) {
-                      const itemData = itemSnap.data() as InventoryItem;
-                      const newQuantity = itemData.quantity + quantityChange;
-                      if (newQuantity <= itemData.reorderPoint && itemData.quantity > itemData.reorderPoint) {
-                          const message = `Low stock alert: ${itemData.name} has only ${newQuantity} items left.`;
-                          const adminsSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
-                          adminsSnapshot.forEach(adminDoc => {
-                              const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
-                              batch.set(notificationRef, {
-                                  recipientUid: adminDoc.id, senderName: "System", message,
-                                  link: `/inventory/${itemId}/edit`, read: false, createdAt: serverTimestamp(), type: 'low-stock'
-                              });
-                          });
-                      }
-                  }
+              const itemSnap = await getDoc(itemDocRef);
+              if (!itemSnap.exists()) {
+                  toast({ title: "Error", description: `Inventory item ${itemId} not found.`, variant: "destructive"});
+                  return;
               }
+              const currentStock = itemSnap.data().quantity;
+              if (currentStock - quantityChange < 0) {
+                  toast({ title: "Stock Unavailable", description: `Not enough stock for ${itemSnap.data().name}.`, variant: "destructive"});
+                  return;
+              }
+          }
+      }
 
-              batch.update(itemDocRef, { quantity: increment(quantityChange) });
+      for (const [itemId, quantityChange] of stockAdjustments.entries()) {
+          if (quantityChange !== 0) {
+              const itemDocRef = doc(db, INVENTORY_COLLECTION, itemId);
+              batch.update(itemDocRef, { quantity: increment(-quantityChange) });
           }
       }
 
@@ -305,15 +299,12 @@ export function useInvoices() {
           newStatus = 'Partially Paid';
       }
 
-      // Update invoice data after cleaning it from undefined values
       const finalUpdateData = cleanDataForFirebase({
-          ...updatedData,
-          status: newStatus,
+          ...updatedData, status: newStatus,
           lineItems: updatedData.lineItems?.map(item => ({...item, id: item.id || crypto.randomUUID()}))
       });
       batch.update(invoiceDocRef, finalUpdateData);
 
-       // Notify Admins
       const message = `${user.username} updated invoice ${id}.`;
       const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
       usersSnapshot.docs.forEach(userDoc => {
@@ -327,11 +318,7 @@ export function useInvoices() {
       });
 
       await batch.commit();
-
-      toast({
-          title: "Invoice Updated",
-          description: `Invoice ${id} has been successfully updated.`,
-      });
+      toast({ title: "Invoice Updated", description: `Invoice ${id} has been successfully updated.` });
       router.push(`/invoice/${id}`);
     } catch (error) {
         console.error("Error updating invoice:", error);
@@ -349,12 +336,9 @@ export function useInvoices() {
 
     try {
         const batch = writeBatch(db);
-        
-        // 1. Update invoice status
         const invoiceDocRef = doc(db, INVOICES_COLLECTION, id);
         batch.update(invoiceDocRef, { status: 'Cancelled' });
 
-        // 2. Restore inventory stock
         invoiceToCancel.lineItems.forEach(lineItem => {
         if (lineItem.inventoryItemId) {
             const itemDocRef = doc(db, INVENTORY_COLLECTION, lineItem.inventoryItemId);
@@ -362,7 +346,6 @@ export function useInvoices() {
         }
         });
 
-        // 3. Notify Admins
         const message = `${user.username} cancelled invoice ${id}.`;
         const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
         usersSnapshot.docs.forEach(userDoc => {
@@ -376,11 +359,7 @@ export function useInvoices() {
         });
 
         await batch.commit();
-        
-        toast({
-            title: "Invoice Cancelled",
-            description: `Invoice ${id} has been cancelled.`,
-        });
+        toast({ title: "Invoice Cancelled", description: `Invoice ${id} has been cancelled.` });
         router.push('/invoices');
     } catch (error) {
         console.error("Error cancelling invoice:", error);
@@ -391,6 +370,13 @@ export function useInvoices() {
   const addPaymentToInvoice = useCallback(async (invoiceId: string, paymentData: Omit<Payment, 'id' | 'date' | 'createdBy' | 'createdByName'>) => {
     if (!user) {
         toast({title: "Error", description: "You must be logged in.", variant: "destructive"});
+        return;
+    }
+
+    const validationResult = paymentServerSchema.safeParse(paymentData);
+    if (!validationResult.success) {
+        const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
+        toast({ title: "Invalid Payment Data", description: errorMessage, variant: "destructive" });
         return;
     }
 
@@ -405,7 +391,7 @@ export function useInvoices() {
         const invoiceRef = doc(db, INVOICES_COLLECTION, invoiceId);
 
         const newPayment: Payment = {
-            ...paymentData,
+            ...validationResult.data,
             id: crypto.randomUUID(),
             date: new Date().toISOString(),
             createdBy: user.uid,
