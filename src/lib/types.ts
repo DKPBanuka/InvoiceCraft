@@ -10,11 +10,32 @@ export interface AuthUser {
   role: UserRole;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  createdAt: string; // ISO string
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  createdAt: string; // ISO string
+}
+
 export type ItemStatus = 'Available' | 'Awaiting Inspection' | 'Damaged' | 'For Repair';
 
 export interface InventoryItem {
   id: string;
   name: string;
+  category: string;
+  brand: string;
   quantity: number;
   price: number; // Selling price
   costPrice: number;
@@ -26,6 +47,7 @@ export interface InventoryItem {
 
 export interface LineItem {
   id: string;
+  type: 'product' | 'service';
   inventoryItemId?: string;
   description: string;
   quantity: number;
@@ -33,15 +55,27 @@ export interface LineItem {
   warrantyPeriod: string;
 }
 
-export type InvoiceStatus = 'Paid' | 'Unpaid' | 'Cancelled';
+export type InvoiceStatus = 'Paid' | 'Unpaid' | 'Partially Paid' | 'Cancelled';
+
+export interface Payment {
+  id: string;
+  amount: number;
+  date: string; // ISO string
+  method: 'Cash' | 'Card' | 'Bank Transfer' | 'Other';
+  notes?: string;
+  createdBy: string; // user uid
+  createdByName: string;
+}
 
 export interface Invoice {
   id:string; // The invoice number, e.g., "INV-2024-0001"
+  customerId?: string;
   customerName: string;
   customerPhone?: string;
   status: InvoiceStatus;
   createdAt: string; // ISO string
   lineItems: LineItem[];
+  payments?: Payment[];
   discount: number; // Percentage discount
   createdBy: string; // User UID
   createdByName: string;
@@ -77,7 +111,7 @@ export interface AppNotification {
   recipientUid: string;
   createdAt: string; // ISO string
   senderName: string;
-  type: 'invoice' | 'inventory' | 'return' | 'general';
+  type: 'invoice' | 'inventory' | 'return' | 'general' | 'low-stock';
 }
 
 export interface Conversation {

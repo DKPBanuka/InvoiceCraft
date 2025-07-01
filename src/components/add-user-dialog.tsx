@@ -29,10 +29,10 @@ export function AddUserDialog({ children }: { children: React.ReactNode }) {
             <p>Please follow these steps:</p>
             <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
                 <li>Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Firebase Console</a> and navigate to your project.</li>
-                <li>From the left menu, select <strong>Authentication</strong>.</li>
-                <li>Click <strong>Add user</strong> and provide their email and a temporary password.</li>
+                <li>From the left menu, select **Authentication**.</li>
+                <li>Click **Add user** and provide their email and a temporary password.</li>
                 <li>When the new user logs into this app for the first time, their account will be automatically created in the database with a 'staff' role.</li>
-                <li>You can then edit their username or role in the <strong>Firestore Database</strong> &rarr; <strong>users</strong> collection if needed.</li>
+                 <li>You can then edit their username or role in the **Firestore Database** -> **users** collection if needed.</li>
             </ol>
         </div>
         <AlertDialogFooter>

@@ -33,10 +33,25 @@ export function useNotifications() {
       (snapshot) => {
         const notificationsData: AppNotification[] = snapshot.docs.map(doc => {
           const data = doc.data();
+          const ts = data.createdAt;
+          let normalizedCreatedAt: string;
+
+          if (ts && typeof ts.toDate === 'function') {
+            normalizedCreatedAt = ts.toDate().toISOString();
+          } else if (ts && typeof ts.seconds === 'number') {
+            normalizedCreatedAt = new Date(ts.seconds * 1000).toISOString();
+          } else if (typeof ts === 'string' && !isNaN(new Date(ts).getTime())) {
+            normalizedCreatedAt = ts;
+          } else if (doc.metadata.hasPendingWrites) {
+            normalizedCreatedAt = new Date().toISOString();
+          } else {
+            normalizedCreatedAt = new Date().toISOString();
+          }
+
           return {
             id: doc.id,
             ...data,
-            createdAt: data.createdAt?.toDate().toISOString() || new Date().toISOString(),
+            createdAt: normalizedCreatedAt,
           } as AppNotification;
         });
         setNotifications(notificationsData);

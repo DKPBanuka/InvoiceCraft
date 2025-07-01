@@ -8,10 +8,12 @@ import AppHeader from '@/components/layout/header';
 import AppSidebar from '@/components/layout/sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { ChatProvider } from '@/contexts/chat-context';
+import MobileBottomNav from '@/components/mobile-bottom-nav';
 
 export const metadata: Metadata = {
   title: 'InvoiceCraft',
   description: 'Create, manage, and store invoices with ease.',
+  manifest: '/manifest.json',
   viewport: {
     width: 'device-width',
     initialScale: 1,
@@ -27,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="theme-color" content="#2081e2" />
+        <meta name="theme-color" content="#87CEEB" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="InvoiceCraft" />
@@ -49,10 +51,11 @@ export default function RootLayout({
                   <AppSidebar />
                   <SidebarInset>
                       <AppHeader />
-                      <main>{children}</main>
+                      <main className="pb-16 md:pb-0">{children}</main>
                   </SidebarInset>
-                  <Toaster />
               </SidebarProvider>
+              <MobileBottomNav />
+              <Toaster />
             </ChatProvider>
         </AuthProvider>
       </body>

@@ -278,15 +278,14 @@ function ReportsDisplay({ inventory, invoices }: { inventory: InventoryItem[], i
             </CardContent>
         </Card>
       </div>
-
-      <SalesChart invoices={invoices} />
-
-      <div className="grid gap-6 lg:grid-cols-2">
+      
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <SalesChart invoices={invoices} />
         <TopProductsChart invoices={invoices} />
         <LowStockItems inventory={inventory} />
+        <InventoryAging inventory={inventory} />
       </div>
 
-      <InventoryAging inventory={inventory} />
     </div>
   );
 }

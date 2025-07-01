@@ -29,6 +29,8 @@ import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Item name is required'),
+  category: z.string().min(2, 'Category is required'),
+  brand: z.string().optional(),
   price: z.coerce.number().min(0, 'Price must be a positive number'),
   costPrice: z.coerce.number().min(0, 'Cost must be a positive number'),
   reorderPoint: z.coerce.number().int('Must be a whole number'),
@@ -54,6 +56,8 @@ export default function InventoryForm({ item }: InventoryFormProps) {
     defaultValues: isEditMode
         ? { 
             name: item.name, 
+            category: item.category || '',
+            brand: item.brand || '',
             price: item.price, 
             costPrice: item.costPrice,
             reorderPoint: item.reorderPoint,
@@ -63,6 +67,8 @@ export default function InventoryForm({ item }: InventoryFormProps) {
         }
         : { 
             name: '', 
+            category: '',
+            brand: '',
             price: 0, 
             costPrice: 0, 
             quantity: 0, 
@@ -79,6 +85,8 @@ export default function InventoryForm({ item }: InventoryFormProps) {
     } else {
         addInventoryItem({
             name: values.name,
+            category: values.category,
+            brand: values.brand,
             price: values.price,
             costPrice: values.costPrice,
             quantity: values.quantity || 0,
@@ -100,9 +108,35 @@ export default function InventoryForm({ item }: InventoryFormProps) {
               name="name"
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
-                  <FormLabel>Item Name</FormLabel>
+                  <FormLabel>Item Name / Model</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. USB Cable" {...field} />
+                    <Input placeholder="e.g. K38, G-Max" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Earphones, Mouse" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="brand"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Brand (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Generic, Logitech" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Bell, Loader2, FileText, Archive, Undo2 } from 'lucide-react';
+import { Bell, Loader2, FileText, Archive, Undo2, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import type { AppNotification } from '@/lib/types';
 const notificationTypeConfig: { [key in AppNotification['type']]: { icon: React.ElementType, color: string }} = {
     invoice: { icon: FileText, color: 'text-blue-500' },
     inventory: { icon: Archive, color: 'text-orange-500' },
+    'low-stock': { icon: AlertTriangle, color: 'text-destructive' },
     return: { icon: Undo2, color: 'text-purple-500' },
     general: { icon: Bell, color: 'text-gray-500' },
 };

@@ -17,6 +17,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2 } from 'lucide-react';
@@ -95,6 +96,8 @@ export default function InventoryList({ inventory, deleteInventoryItem }: Invent
           <TableHeader>
             <TableRow>
               <TableHead>Item Name</TableHead>
+              <TableHead>Brand</TableHead>
+              <TableHead>Category</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Selling Price</TableHead>
               {user?.role === 'admin' && <TableHead className="text-right">Cost Price</TableHead>}
@@ -107,6 +110,8 @@ export default function InventoryList({ inventory, deleteInventoryItem }: Invent
             {inventory.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell>{item.brand}</TableCell>
+                <TableCell>{item.category}</TableCell>
                 <TableCell>
                   <Badge className={cn('text-xs', statusStyles[item.status])}>{item.status}</Badge>
                 </TableCell>
@@ -146,7 +151,10 @@ export default function InventoryList({ inventory, deleteInventoryItem }: Invent
           <Card key={item.id} className="bg-white">
             <CardHeader>
                 <div className="flex justify-between items-start">
-                    <CardTitle>{item.name}</CardTitle>
+                    <div>
+                        <CardTitle>{item.name}</CardTitle>
+                        <CardDescription>{item.brand} / {item.category}</CardDescription>
+                    </div>
                     <Badge className={cn('text-xs', statusStyles[item.status])}>{item.status}</Badge>
                 </div>
             </CardHeader>

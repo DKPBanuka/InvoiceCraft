@@ -4,8 +4,8 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Loader2, ChevronsUpDown, Wand2, Percent, Contact } from 'lucide-react';
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { Plus, Trash2, Loader2, ChevronsUpDown, Percent, Package, Wrench } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,70 +24,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useInvoices } from '@/hooks/use-invoices';
 import { cn } from '@/lib/utils';
 import type { Invoice, InventoryItem } from '@/lib/types';
 import { useInventory } from '@/hooks/use-inventory';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { suggestLineItemAction } from '@/app/actions';
 import { useAuth } from '@/contexts/auth-context';
+import { Badge } from './ui/badge';
+import CustomerSelector from './customer-selector';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { suggestLineItemAction } from '@/app/actions';
 
-interface InvoiceFormProps {
-    invoice?: Invoice;
-}
 
-function InventoryItemSelector({ form, index, onSuggestionApplied }: { form: any; index: number, onSuggestionApplied: () => void }) {
-  const { inventory } = useInventory();
+function ProductSelector({ form, index, availableInventory }: { form: any; index: number; availableInventory: InventoryItem[] }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [suggestion, setSuggestion] = useState('');
-  const [isSuggesting, setIsSuggesting] = useState(false);
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const descriptionValue = form.watch(`lineItems.${index}.description`);
-
-  const fetchSuggestion = useCallback(async (value: string) => {
-    if (value && value.length > 2) {
-      setIsSuggesting(true);
-      try {
-        const result = await suggestLineItemAction({ partialDescription: value });
-        if (result.suggestion && result.suggestion.toLowerCase() !== value.toLowerCase()) {
-          setSuggestion(result.suggestion);
-        } else {
-          setSuggestion('');
-        }
-      } catch (error) {
-        console.error("Failed to fetch suggestion:", error);
-        setSuggestion('');
-      } finally {
-        setIsSuggesting(false);
-      }
-    } else {
-      setSuggestion('');
-    }
-  }, []);
-
-  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    form.setValue(`lineItems.${index}.description`, value, { shouldValidate: true });
-    form.setValue(`lineItems.${index}.inventoryItemId`, undefined, { shouldValidate: true });
-
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-    }
-    debounceTimeout.current = setTimeout(() => {
-      fetchSuggestion(value);
-    }, 500); // 500ms debounce
-  };
-
-  const applySuggestion = () => {
-    if (suggestion) {
-      form.setValue(`lineItems.${index}.description`, suggestion, { shouldValidate: true });
-      onSuggestionApplied();
-      setSuggestion('');
-    }
-  };
+  const selectedDescription = form.watch(`lineItems.${index}.description`);
 
   const handleSelect = (item: InventoryItem) => {
     form.setValue(`lineItems.${index}.inventoryItemId`, item.id, { shouldValidate: true });
@@ -97,118 +52,109 @@ function InventoryItemSelector({ form, index, onSuggestionApplied }: { form: any
     form.setValue(`lineItems.${index}.quantity`, 1, { shouldValidate: true });
     setOpen(false);
     setSearchTerm('');
-    setSuggestion('');
   };
-  
-  const filteredInventory = useMemo(() => {
-    if (!searchTerm) return inventory.filter(i => i.status === 'Available');
-    return inventory.filter(item => 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) && item.status === 'Available'
-    );
-  }, [inventory, searchTerm]);
 
+  const filteredInventory = useMemo(() => {
+    if (!searchTerm) return availableInventory;
+    return availableInventory.filter(item =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [availableInventory, searchTerm]);
 
   return (
-    <div className="space-y-2">
-      <div className="relative">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <FormControl>
-              <Input
-                placeholder="Type or select an item..."
-                value={descriptionValue || ''}
-                onChange={handleDescriptionChange}
-                className="pr-8"
-              />
-            </FormControl>
-          </PopoverTrigger>
-          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-             <div className="p-2">
-                <Input
-                    placeholder="Search inventory..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    autoFocus
-                />
-             </div>
-             <div className="max-h-60 overflow-y-auto">
-                {filteredInventory.length > 0 ? (
-                    filteredInventory.map((item) => (
-                        <Button
-                            key={item.id}
-                            variant="ghost"
-                            className="w-full justify-start font-normal"
-                            onClick={() => handleSelect(item)}
-                        >
-                            {item.name} <span className="text-xs text-muted-foreground ml-auto">{item.quantity} in stock</span>
-                        </Button>
-                    ))
-                ) : (
-                    <div className="p-4 text-sm text-center text-muted-foreground">No items found.</div>
-                )}
-             </div>
-          </PopoverContent>
-        </Popover>
-        <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-            {isSuggesting ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : (
-                <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <FormControl>
+          <Button
+            variant="outline"
+            role="combobox"
+            className={cn(
+              "w-full justify-between",
+              !selectedDescription && "text-muted-foreground"
             )}
+          >
+            {selectedDescription || "Select a product"}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </FormControl>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <div className="p-2">
+            <Input 
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+            />
         </div>
-      </div>
-       {suggestion && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full justify-start text-left font-normal"
-          onClick={applySuggestion}
-        >
-          <Wand2 className="mr-2 h-4 w-4 text-primary" />
-          Suggest: {suggestion}
-        </Button>
-      )}
-      <FormMessage>{form.formState.errors.lineItems?.[index]?.description?.message}</FormMessage>
-    </div>
+        <div className="max-h-60 overflow-y-auto">
+          {filteredInventory.length > 0 ? (
+            filteredInventory.map((item) => (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className="w-full justify-start font-normal h-auto py-2"
+                onClick={() => handleSelect(item)}
+              >
+                <div className="flex flex-col items-start text-left">
+                  <span>{item.name}</span>
+                  <span className="text-xs text-muted-foreground">{item.quantity} in stock</span>
+                </div>
+              </Button>
+            ))
+          ) : (
+            <div className="p-4 text-sm text-center text-muted-foreground">
+              No items match your search.
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
+interface InvoiceFormProps {
+    invoice?: Invoice;
+}
 
 export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const { addInvoice, updateInvoice } = useInvoices();
   const { inventory } = useInventory();
   const { user } = useAuth();
   const isEditMode = !!invoice;
-  const [isContactPickerSupported, setIsContactPickerSupported] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window) {
-      setIsContactPickerSupported(true);
-    }
-  }, []);
-
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  
   const formSchema = useMemo(() => {
     return z.object({
-      customerName: z.string().min(2, 'Customer name is required'),
+      customerId: z.string().optional(),
+      customerName: z.string().min(1, 'Customer name is required'),
       customerPhone: z.string().optional(),
-      status: z.enum(['Paid', 'Unpaid']),
+      status: z.enum(['Paid', 'Unpaid', 'Partially Paid']),
       discount: z.coerce.number().min(0, "Discount can't be negative").max(100, "Discount can't be over 100%"),
+      initialPayment: z.coerce.number().optional(),
       lineItems: z
         .array(
           z.object({
             id: z.string().optional(),
+            type: z.enum(['product', 'service']).default('product'),
             inventoryItemId: z.string().optional(),
-            description: z.string().min(1, 'Description is required'),
+            description: z.string(),
             quantity: z.coerce.number().min(1, 'Must be at least 1'),
-            price: z.coerce.number().min(0.01, 'Price is required'),
+            price: z.coerce.number().min(0, 'Price cannot be negative'),
             warrantyPeriod: z.string().min(1, 'Warranty period is required'),
           })
         )
         .min(1, 'At least one line item is required')
         .superRefine((lineItems, ctx) => {
           lineItems.forEach((lineItem, index) => {
-            if (lineItem.inventoryItemId) {
+             if (lineItem.description.trim() === '') {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Description is required`,
+                path: [index, 'description'],
+              });
+            }
+            if (lineItem.type === 'product') {
               const stockItem = inventory.find(i => i.id === lineItem.inventoryItemId);
               if (stockItem) {
                 let originalQuantity = 0;
@@ -234,6 +180,36 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
             }
           });
         }),
+    }).superRefine((data, ctx) => {
+        if (isEditMode) {
+          // This validation is only for new invoices with an initial payment.
+          return;
+        }
+
+        const watchLineItems = data.lineItems;
+        const watchDiscount = data.discount;
+        const subtotal = watchLineItems.reduce(
+            (acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0),
+            0
+        );
+        const discountAmount = subtotal * ((Number(watchDiscount) || 0) / 100);
+        const totalAmount = subtotal - discountAmount;
+
+        if (data.status === 'Partially Paid') {
+            if (!data.initialPayment || data.initialPayment <= 0) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Payment amount is required for partially paid status.",
+                    path: ['initialPayment'],
+                });
+            } else if (data.initialPayment >= totalAmount) {
+                 ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Payment must be less than the total of Rs.${totalAmount.toFixed(2)}.`,
+                    path: ['initialPayment'],
+                });
+            }
+        }
     });
   }, [inventory, isEditMode, invoice]);
   
@@ -244,41 +220,42 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: isEditMode
         ? {
-            customerName: invoice.customerName,
+            ...invoice,
             customerPhone: invoice.customerPhone || '',
-            status: invoice.status === 'Paid' ? 'Paid' : 'Unpaid',
-            lineItems: invoice.lineItems.map(item => ({
-              id: item.id,
-              inventoryItemId: item.inventoryItemId,
-              description: item.description,
-              quantity: item.quantity,
-              price: item.price,
-              warrantyPeriod: item.warrantyPeriod,
-            })),
             discount: invoice.discount || 0,
+            initialPayment: 0
           }
         : {
             customerName: '',
             customerPhone: '',
             status: 'Paid',
-            lineItems: [{ description: '', quantity: 1, price: 0, warrantyPeriod: 'N/A' }],
+            lineItems: [{ type: 'product', description: '', quantity: 1, price: 0, warrantyPeriod: 'N/A' }],
             discount: 0,
+            initialPayment: 0,
         },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'lineItems',
   });
 
-  const handleSuggestionApplied = useCallback((index: number) => {
-    const currentLineItem = form.getValues(`lineItems.${index}`);
-    update(index, { ...currentLineItem });
-  }, [form, update]);
+  const uniqueCategories = useMemo(() => {
+    const categories = new Set(inventory.map(item => item.category).filter(Boolean));
+    return ['All', ...Array.from(categories).sort()];
+  }, [inventory]);
 
+  const availableInventory = useMemo(() => {
+    const availableItems = inventory.filter(i => i.status === 'Available');
+    if (categoryFilter === 'All') {
+        return availableItems;
+    }
+    return availableItems.filter(i => i.category === categoryFilter);
+  }, [inventory, categoryFilter]);
 
   const watchLineItems = form.watch('lineItems');
   const watchDiscount = form.watch('discount');
+  const watchStatus = form.watch('status');
   
   const subtotal = watchLineItems.reduce(
     (acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0),
@@ -287,33 +264,12 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   const discountAmount = subtotal * ((Number(watchDiscount) || 0) / 100);
   const totalAmount = subtotal - discountAmount;
 
-  const handleSelectContact = async () => {
-    if (!isContactPickerSupported) return;
-    try {
-        const contacts = await (navigator as any).contacts.select(['tel'], { multiple: false });
-        if (contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
-            form.setValue('customerPhone', contacts[0].tel[0], { shouldValidate: true });
-        }
-    } catch (ex) {
-        console.log("Contact Picker was closed or failed."); // User might cancel, which is fine.
-    }
-  };
-
-
   function onSubmit(values: InvoiceFormData) {
-    const invoiceData = {
-      ...values,
-      status: values.status as 'Paid' | 'Unpaid',
-      lineItems: values.lineItems.map(item => ({
-        ...item,
-        id: item.id ?? '', // Ensure id is always a string
-      })),
-    };
-
     if (isEditMode && invoice) {
-        updateInvoice(invoice.id, invoiceData);
+        const { status, initialPayment, ...updateData} = values; // Status is recalculated in the hook, so we don't pass it.
+        updateInvoice(invoice.id, updateData);
     } else {
-        addInvoice(invoiceData as any);
+        addInvoice(values);
     }
   }
 
@@ -321,168 +277,174 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <Card className="bg-white">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="customerName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Customer Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. John Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="customerPhone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Customer Phone</FormLabel>
-                    <div className="relative">
-                      <FormControl>
-                        <Input
-                          placeholder="e.g. 0771234567"
-                          {...field}
-                          className={isContactPickerSupported ? 'pr-12' : ''}
-                        />
-                      </FormControl>
-                      {isContactPickerSupported && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute inset-y-0 right-0 h-full"
-                          onClick={handleSelectContact}
-                          aria-label="Select from contacts"
-                        >
-                          <Contact className="h-5 w-5 text-muted-foreground" />
-                        </Button>
-                      )}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Unpaid">Unpaid</SelectItem>
-                        <SelectItem value="Paid">Paid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+          <CardHeader>
+            <CardTitle>Customer Information</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 pt-0">
+             <CustomerSelector form={form}/>
           </CardContent>
         </Card>
 
         <Card className="bg-white">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold font-headline mb-4">Line Items</h3>
-            <div className="space-y-4">
-              {fields.map((field, index) => (
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <CardTitle>Line Items</CardTitle>
+                 <div className="w-full sm:w-auto sm:max-w-xs">
+                     <Select onValueChange={setCategoryFilter} defaultValue={categoryFilter}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filter by category..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {uniqueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                 </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 pt-0">
+            <div className="space-y-6">
+              {fields.map((field, index) => {
+                const lineItemType = form.watch(`lineItems.${index}.type`);
+                return (
                 <div
                   key={field.id}
-                  className="grid grid-cols-12 gap-x-4 gap-y-2 items-start"
+                  className="grid grid-cols-1 gap-y-4 rounded-md border p-4 md:grid-cols-12 md:gap-x-4 md:items-end"
                 >
-                  <div className="col-span-12 md:col-span-4">
-                    {index === 0 && <FormLabel>Description</FormLabel>}
-                    <InventoryItemSelector form={form} index={index} onSuggestionApplied={() => handleSuggestionApplied(index)} />
-                  </div>
-                  <div className="col-span-4 md:col-span-2">
-                    {index === 0 && <FormLabel>Qty</FormLabel>}
-                    <FormField
-                      control={form.control}
-                      name={`lineItems.${index}.quantity`}
-                      render={({ field }) => (
-                          <FormControl>
-                            <Input type="number" placeholder="1" {...field} className="w-full" onFocus={(e) => e.target.select()}/>
-                          </FormControl>
-                      )}
-                    />
-                    <FormMessage className="mt-1">{form.formState.errors.lineItems?.[index]?.quantity?.message}</FormMessage>
-                  </div>
-                  <div className="col-span-4 md:col-span-2">
-                    {index === 0 && <FormLabel>Price</FormLabel>}
-                    <FormField
-                      control={form.control}
-                      name={`lineItems.${index}.price`}
-                      render={({ field }) => (
-                        <FormControl>
-                          <Input type="number" placeholder="0.00" {...field} onFocus={(e) => e.target.select()} />
-                        </FormControl>
-                      )}
-                    />
-                    <FormMessage className="mt-1">{form.formState.errors.lineItems?.[index]?.price?.message}</FormMessage>
-                  </div>
-                   <div className="col-span-4 md:col-span-3">
-                    {index === 0 && <FormLabel>Warranty</FormLabel>}
+                  <div className="md:col-span-12">
                      <FormField
-                        control={form.control}
-                        name={`lineItems.${index}.warrantyPeriod`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                      control={form.control}
+                      name={`lineItems.${index}.type`}
+                      render={({ field }) => (
+                        <FormItem className="space-y-3">
+                          <FormLabel>Line Item Type</FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              onValueChange={(value) => {
+                                form.setValue(`lineItems.${index}.inventoryItemId`, undefined);
+                                form.setValue(`lineItems.${index}.description`, '');
+                                form.setValue(`lineItems.${index}.price`, 0);
+                                form.setValue(`lineItems.${index}.warrantyPeriod`, 'N/A');
+                                field.onChange(value);
+                              }}
+                              value={field.value}
+                              className="flex items-center space-x-4"
+                            >
+                              <FormItem className="flex items-center space-x-2 space-y-0">
                                 <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select warranty" />
-                                  </SelectTrigger>
+                                  <RadioGroupItem value="product" />
                                 </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="N/A">N/A</SelectItem>
-                                    <SelectItem value="1 Week">1 Week</SelectItem>
-                                    <SelectItem value="1 Month">1 Month</SelectItem>
-                                    <SelectItem value="2 Months">2 Months</SelectItem>
-                                    <SelectItem value="3 Months">3 Months</SelectItem>
-                                    <SelectItem value="6 Months">6 Months</SelectItem>
-                                    <SelectItem value="1 Year">1 Year</SelectItem>
-                                    <SelectItem value="2 Years">2 Years</SelectItem>
-                                </SelectContent>
-                            </Select>
-                             <FormMessage className="mt-1">{form.formState.errors.lineItems?.[index]?.warrantyPeriod?.message}</FormMessage>
-                          </FormItem>
+                                <FormLabel className="font-normal flex items-center gap-2"><Package className="h-4 w-4" /> Product</FormLabel>
+                              </FormItem>
+                              <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl>
+                                  <RadioGroupItem value="service" />
+                                </FormControl>
+                                <FormLabel className="font-normal flex items-center gap-2"><Wrench className="h-4 w-4" /> Service</FormLabel>
+                              </FormItem>
+                            </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="col-span-12 md:col-span-4">
+                      <FormLabel>Description</FormLabel>
+                       {lineItemType === 'product' ? (
+                        <ProductSelector form={form} index={index} availableInventory={availableInventory} />
+                      ) : (
+                        <FormField
+                          control={form.control}
+                          name={`lineItems.${index}.description`}
+                          render={({ field }) => (
+                            <FormControl>
+                              <Input placeholder="e.g. Headlight fitting charge" {...field} />
+                            </FormControl>
+                          )}
+                        />
+                      )}
+                      <FormMessage className="mt-1">{form.formState.errors.lineItems?.[index]?.description?.message}</FormMessage>
+                  </div>
+
+                  <div className="col-span-6 md:col-span-2">
+                        <FormLabel>Quantity</FormLabel>
+                        <FormField
+                        control={form.control}
+                        name={`lineItems.${index}.quantity`}
+                        render={({ field }) => (
+                            <FormControl>
+                                <Input type="number" placeholder="1" {...field} onFocus={(e) => e.target.select()}/>
+                            </FormControl>
                         )}
-                      />
-                  </div>
-                  <div className="col-span-12 md:col-span-1 flex items-end h-full">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => remove(index)}
-                      disabled={fields.length === 1}
-                      className={cn(index === 0 && "md:mt-6", "w-full md:w-auto")}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                        />
+                        <FormMessage className="mt-1">{form.formState.errors.lineItems?.[index]?.quantity?.message}</FormMessage>
+                    </div>
+                    <div className="col-span-6 md:col-span-2">
+                        <FormLabel>Price (Rs.)</FormLabel>
+                        <FormField
+                        control={form.control}
+                        name={`lineItems.${index}.price`}
+                        render={({ field }) => (
+                            <FormControl>
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} onFocus={(e) => e.target.select()} />
+                            </FormControl>
+                        )}
+                        />
+                        <FormMessage className="mt-1">{form.formState.errors.lineItems?.[index]?.price?.message}</FormMessage>
+                    </div>
+                    <div className="col-span-12 md:col-span-3">
+                        <FormLabel>Warranty</FormLabel>
+                        <FormField
+                            control={form.control}
+                            name={`lineItems.${index}.warrantyPeriod`}
+                            render={({ field }) => (
+                            <FormItem>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select warranty" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="N/A">N/A</SelectItem>
+                                        <SelectItem value="1 Week">1 Week</SelectItem>
+                                        <SelectItem value="1 Month">1 Month</SelectItem>
+                                        <SelectItem value="2 Months">2 Months</SelectItem>
+                                        <SelectItem value="3 Months">3 Months</SelectItem>
+                                        <SelectItem value="6 Months">6 Months</SelectItem>
+                                        <SelectItem value="1 Year">1 Year</SelectItem>
+                                        <SelectItem value="2 Years">2 Years</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage className="mt-1">{form.formState.errors.lineItems?.[index]?.warrantyPeriod?.message}</FormMessage>
+                            </FormItem>
+                            )}
+                        />
+                    </div>
+                    <div className="col-span-12 md:col-span-1 flex items-end">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
+                        className="w-full"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete</span>
+                      </Button>
+                    </div>
                 </div>
-              ))}
+              )})}
             </div>
             <Button
               type="button"
               variant="outline"
-              onClick={() => append({ description: '', quantity: 1, price: 0, warrantyPeriod: 'N/A' })}
-              className="mt-4"
+              onClick={() => append({ type: 'product', description: '', quantity: 1, price: 0, warrantyPeriod: 'N/A' })}
+              className="mt-6"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Add Item
+              Add Line Item
             </Button>
           </CardContent>
         </Card>
@@ -490,7 +452,10 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
                 <Card className="bg-white h-full">
-                    <CardContent className="p-6">
+                    <CardHeader>
+                      <CardTitle>Discount</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 pt-0">
                         <FormField
                             control={form.control}
                             name="discount"
@@ -501,6 +466,7 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                                         <FormControl>
                                             <Input 
                                                 type="number" 
+                                                step="0.01"
                                                 placeholder="0" 
                                                 {...field} 
                                                 disabled={user?.role === 'staff'}
@@ -524,6 +490,86 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
             </p>
             </div>
         </div>
+
+        {isEditMode && invoice ? (
+            <Card className="bg-white">
+                <CardHeader>
+                    <CardTitle>Invoice Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                     <div className="flex items-center h-10">
+                        <Badge>{invoice.status}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">Status is updated automatically based on payments.</p>
+                </CardContent>
+            </Card>
+        ) : (
+             <Card className="bg-white">
+                <CardHeader>
+                    <CardTitle>Initial Payment Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                     <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                            <FormItem className="space-y-3">
+                                <FormLabel>Select Initial Status</FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                    className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+                                    >
+                                        <FormItem>
+                                            <FormControl>
+                                                <RadioGroupItem value="Unpaid" id="unpaid" className="sr-only peer" />
+                                            </FormControl>
+                                            <Label htmlFor="unpaid" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                                Unpaid
+                                            </Label>
+                                        </FormItem>
+                                        <FormItem>
+                                            <FormControl>
+                                                <RadioGroupItem value="Paid" id="paid" className="sr-only peer" />
+                                            </FormControl>
+                                            <Label htmlFor="paid" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                                Paid in Full
+                                            </Label>
+                                        </FormItem>
+                                        <FormItem>
+                                            <FormControl>
+                                                <RadioGroupItem value="Partially Paid" id="partial" className="sr-only peer" />
+                                            </FormControl>
+                                            <Label htmlFor="partial" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                                Partially Paid
+                                            </Label>
+                                        </FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    {watchStatus === 'Partially Paid' && (
+                        <FormField
+                            control={form.control}
+                            name="initialPayment"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Initial Payment Amount (Rs.)</FormLabel>
+                                <FormControl>
+                                <Input type="number" step="0.01" placeholder="Enter amount paid" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    )}
+                </CardContent>
+            </Card>
+        )}
+
 
         <div className="flex justify-end">
           <Button type="submit" size="lg" disabled={form.formState.isSubmitting}>

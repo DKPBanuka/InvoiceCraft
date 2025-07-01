@@ -41,14 +41,41 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const convos = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Conversation[];
+        const convos = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          const ts = data.lastMessageTimestamp;
+          let normalizedTs: any = ts; // Can be null, keep it that way if it is
+
+          if (ts) {
+            if (typeof ts.toDate !== 'function') {
+              if (typeof ts.seconds === 'number') {
+                normalizedTs = { toDate: () => new Date(ts.seconds * 1000) };
+              } else {
+                // It's some other format, maybe an ISO string from a previous faulty save. Try to parse.
+                const parsedDate = new Date(ts);
+                if (!isNaN(parsedDate.getTime())) {
+                    normalizedTs = { toDate: () => parsedDate };
+                } else {
+                    // Unparseable, nullify it to prevent crash
+                    normalizedTs = null;
+                }
+              }
+            }
+          } else if (doc.metadata.hasPendingWrites) {
+            // If no timestamp and write is pending, use current time
+            normalizedTs = { toDate: () => new Date() };
+          }
+          
+          return {
+            id: doc.id,
+            ...data,
+            lastMessageTimestamp: normalizedTs,
+          };
+        }) as Conversation[];
 
         convos.sort((a, b) => {
-          const timeA = a.lastMessageTimestamp?.toMillis() || 0;
-          const timeB = b.lastMessageTimestamp?.toMillis() || 0;
+          const timeA = a.lastMessageTimestamp?.toDate().getTime() || 0;
+          const timeB = b.lastMessageTimestamp?.toDate().getTime() || 0;
           return timeB - timeA;
         });
 

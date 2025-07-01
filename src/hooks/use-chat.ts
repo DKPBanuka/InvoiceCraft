@@ -43,10 +43,34 @@ export function useChat() {
     );
     
     const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Message[];
+      const msgs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const ts = data.createdAt;
+        let normalizedTs: any = ts;
+
+        if (ts) {
+          if (typeof ts.toDate !== 'function') {
+            if (typeof ts.seconds === 'number') {
+              normalizedTs = { toDate: () => new Date(ts.seconds * 1000) };
+            } else {
+              const parsedDate = new Date(ts);
+              if (!isNaN(parsedDate.getTime())) {
+                  normalizedTs = { toDate: () => parsedDate };
+              } else {
+                  normalizedTs = null;
+              }
+            }
+          }
+        } else if (doc.metadata.hasPendingWrites) {
+          normalizedTs = { toDate: () => new Date() };
+        }
+        
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: normalizedTs,
+        }
+      }) as Message[];
       setMessages(msgs);
 
       // Reset unread count for the current user when they view messages

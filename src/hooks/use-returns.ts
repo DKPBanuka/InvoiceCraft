@@ -39,11 +39,38 @@ export function useReturns() {
       (snapshot) => {
         const returnsData: ReturnItem[] = snapshot.docs.map(doc => {
           const data = doc.data();
+
+          const createdAtTs = data.createdAt;
+          let normalizedCreatedAt: string;
+          if (createdAtTs && typeof createdAtTs.toDate === 'function') {
+            normalizedCreatedAt = createdAtTs.toDate().toISOString();
+          } else if (createdAtTs && typeof createdAtTs.seconds === 'number') {
+            normalizedCreatedAt = new Date(createdAtTs.seconds * 1000).toISOString();
+          } else if (typeof createdAtTs === 'string' && !isNaN(new Date(createdAtTs).getTime())) {
+            normalizedCreatedAt = createdAtTs;
+          } else if (doc.metadata.hasPendingWrites) {
+            normalizedCreatedAt = new Date().toISOString();
+          } else {
+            normalizedCreatedAt = new Date().toISOString();
+          }
+
+          const resolutionDateTs = data.resolutionDate;
+          let normalizedResolutionDate: string | undefined = undefined;
+          if (resolutionDateTs) {
+             if (resolutionDateTs && typeof resolutionDateTs.toDate === 'function') {
+                normalizedResolutionDate = resolutionDateTs.toDate().toISOString();
+            } else if (resolutionDateTs && typeof resolutionDateTs.seconds === 'number') {
+                normalizedResolutionDate = new Date(resolutionDateTs.seconds * 1000).toISOString();
+            } else if (typeof resolutionDateTs === 'string' && !isNaN(new Date(resolutionDateTs).getTime())) {
+                normalizedResolutionDate = resolutionDateTs;
+            }
+          }
+          
           return {
             id: doc.id,
             ...data,
-            createdAt: data.createdAt?.toDate().toISOString() || new Date().toISOString(),
-            resolutionDate: data.resolutionDate?.toDate().toISOString(),
+            createdAt: normalizedCreatedAt,
+            resolutionDate: normalizedResolutionDate,
           } as ReturnItem;
         });
         setReturns(returnsData);

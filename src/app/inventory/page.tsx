@@ -26,29 +26,44 @@ export default function InventoryPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ItemStatus | 'All'>('All');
+  const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [brandFilter, setBrandFilter] = useState<string>('All');
 
   const isLoading = inventoryLoading || authLoading;
 
-  const { totalItemTypes, totalStockQuantity } = useMemo(() => {
+  const { totalItemTypes, totalStockQuantity, uniqueCategories, uniqueBrands } = useMemo(() => {
     const totalStock = inventory.reduce((sum, item) => sum + item.quantity, 0);
-    return { totalItemTypes: inventory.length, totalStockQuantity: totalStock };
+    const categories = new Set(inventory.map(item => item.category).filter(Boolean));
+    const brands = new Set(inventory.map(item => item.brand).filter(Boolean));
+    return { 
+      totalItemTypes: inventory.length, 
+      totalStockQuantity: totalStock,
+      uniqueCategories: ['All', ...Array.from(categories).sort()],
+      uniqueBrands: ['All', ...Array.from(brands).sort()],
+    };
   }, [inventory]);
 
   const filteredInventory = useMemo(() => {
     return inventory.filter(
       (item) => {
-        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              item.category?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const matchesCategory = categoryFilter === 'All' || item.category === categoryFilter;
+        const matchesBrand = brandFilter === 'All' || item.brand === brandFilter;
+        return matchesSearch && matchesStatus && matchesCategory && matchesBrand;
       }
     );
-  }, [inventory, searchTerm, statusFilter]);
+  }, [inventory, searchTerm, statusFilter, categoryFilter, brandFilter]);
 
   const handleExport = () => {
     const dataToExport = filteredInventory.map(item => {
         const baseData: any = {
             id: item.id,
             name: item.name,
+            category: item.category,
+            brand: item.brand,
             status: item.status,
             price: item.price.toFixed(2),
             quantity: item.quantity,
@@ -65,6 +80,8 @@ export default function InventoryPage() {
     const headers: any = {
         id: 'Item ID',
         name: 'Item Name',
+        category: 'Category',
+        brand: 'Brand',
         status: 'Status',
         price: 'Selling Price (Rs.)',
         quantity: 'Stock Quantity',
@@ -130,18 +147,34 @@ export default function InventoryPage() {
 
       {inventory.length > 0 ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="relative sm:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="relative lg:col-span-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                 type="text"
-                placeholder="Search by item name..."
+                placeholder="Search by name, brand, category..."
                 className="w-full bg-white py-3 pl-10 pr-4 shadow-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
-            <Select onValueChange={(value) => setStatusFilter(value as ItemStatus | 'All')} defaultValue="All">
+             <Select onValueChange={(value) => setBrandFilter(value)} defaultValue="All">
+                <SelectTrigger className="bg-white shadow-sm">
+                    <SelectValue placeholder="Filter by brand" />
+                </SelectTrigger>
+                <SelectContent>
+                    {uniqueBrands.map(brand => <SelectItem key={brand} value={brand}>{brand}</SelectItem>)}
+                </SelectContent>
+            </Select>
+             <Select onValueChange={(value) => setCategoryFilter(value)} defaultValue="All">
+                <SelectTrigger className="bg-white shadow-sm">
+                    <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                    {uniqueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                </SelectContent>
+            </Select>
+             <Select onValueChange={(value) => setStatusFilter(value as ItemStatus | 'All')} defaultValue="All">
                 <SelectTrigger className="bg-white shadow-sm">
                     <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>

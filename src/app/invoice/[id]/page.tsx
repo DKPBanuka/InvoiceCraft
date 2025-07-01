@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useInvoices } from '@/hooks/use-invoices';
 import InvoiceView from '@/components/invoice-view';
 import { Button } from '@/components/ui/button';
-import { Printer, Edit, ArrowLeft, Loader2, FileX2 } from 'lucide-react';
+import { Printer, Edit, ArrowLeft, Loader2, FileX2, HandCoins } from 'lucide-react';
 import type { Invoice } from '@/lib/types';
 import {
   AlertDialog,
@@ -22,12 +22,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useAuth } from '@/contexts/auth-context';
-
+import { AddPaymentDialog } from '@/components/add-payment-dialog';
 
 export default function InvoiceDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const { getInvoice, isLoading: invoicesLoading, cancelInvoice } = useInvoices();
+  const { getInvoice, isLoading: invoicesLoading, cancelInvoice, addPaymentToInvoice } = useInvoices();
   const { user, isLoading: authLoading } = useAuth();
   const [invoice, setInvoice] = useState<Invoice | undefined>(undefined);
 
@@ -40,7 +40,6 @@ export default function InvoiceDetailPage() {
       if (foundInvoice) {
         setInvoice(foundInvoice);
       } else {
-        // Optionally redirect or show a not found message
         router.push('/');
       }
     }
@@ -53,19 +52,14 @@ export default function InvoiceDetailPage() {
     const newTitle = `${invoice.customerName.replace(/\s+/g, '_')}_${invoice.id}`;
     document.title = newTitle;
 
-    // This event fires after the user prints or cancels the print dialog.
-    // The { once: true } option ensures the listener is automatically removed after firing.
     window.addEventListener('afterprint', () => {
         document.title = originalTitle;
     }, { once: true });
 
-    // Use a short timeout to ensure the title update is processed before the print dialog opens,
-    // which can help with inconsistencies in mobile browsers.
     setTimeout(() => {
         window.print();
     }, 100);
   };
-
 
   if (isLoading || !invoice) {
     return (
@@ -74,6 +68,8 @@ export default function InvoiceDetailPage() {
       </div>
     );
   }
+
+  const isActionable = invoice.status !== 'Cancelled' && invoice.status !== 'Paid';
 
   return (
     <div className="bg-muted/30 min-h-screen">
@@ -84,6 +80,14 @@ export default function InvoiceDetailPage() {
                     Back
                 </Button>
                 <div className="flex flex-wrap justify-end items-center gap-2">
+                    {isActionable && (
+                        <AddPaymentDialog invoice={invoice} addPaymentToInvoice={addPaymentToInvoice}>
+                            <Button size="sm">
+                                <HandCoins className="h-4 w-4" />
+                                <span className="sr-only sm:not-sr-only sm:ml-2">Add Payment</span>
+                            </Button>
+                        </AddPaymentDialog>
+                    )}
                     {user?.role === 'admin' && invoice.status !== 'Cancelled' && (
                         <Link href={`/invoice/${id}/edit`} passHref>
                             <Button variant="outline" size="sm" className="w-9 px-0 sm:w-auto sm:px-3">

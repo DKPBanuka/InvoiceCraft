@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import type { AuthUser } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 
 const USERS_COLLECTION = 'users';
@@ -17,16 +17,29 @@ export function useUsers() {
   const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'admin') {
+    if (!currentUser) {
       setIsLoading(false);
       setUsers([]);
-      if (currentUser) {
-          toast({ title: "Permission Denied", description: "You are not authorized to view users.", variant: "destructive" });
-      }
       return;
     }
 
-    const unsubscribe = onSnapshot(collection(db, USERS_COLLECTION), 
+    let usersQuery;
+    
+    // Admins can see all users
+    if (currentUser.role === 'admin') {
+      usersQuery = query(collection(db, USERS_COLLECTION));
+    } 
+    // Staff can only see admins to start chats with
+    else if (currentUser.role === 'staff') {
+      usersQuery = query(collection(db, USERS_COLLECTION), where('role', '==', 'admin'));
+    }
+    else {
+      setIsLoading(false);
+      setUsers([]);
+      return;
+    }
+
+    const unsubscribe = onSnapshot(usersQuery, 
       (snapshot) => {
         const usersData: AuthUser[] = snapshot.docs.map(doc => {
           const data = doc.data();

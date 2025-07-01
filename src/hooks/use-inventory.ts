@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import type { InventoryItem } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, increment, writeBatch, query, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, increment, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 
 const INVENTORY_COLLECTION = 'inventory';
@@ -29,10 +29,25 @@ export function useInventory() {
       (snapshot) => {
         const inventoryData: InventoryItem[] = snapshot.docs.map(doc => {
           const data = doc.data();
+          const ts = data.createdAt;
+          let normalizedCreatedAt: string;
+
+          if (ts && typeof ts.toDate === 'function') {
+            normalizedCreatedAt = ts.toDate().toISOString();
+          } else if (ts && typeof ts.seconds === 'number') {
+            normalizedCreatedAt = new Date(ts.seconds * 1000).toISOString();
+          } else if (typeof ts === 'string' && !isNaN(new Date(ts).getTime())) {
+            normalizedCreatedAt = ts;
+          } else if (doc.metadata.hasPendingWrites) {
+            normalizedCreatedAt = new Date().toISOString();
+          } else {
+            normalizedCreatedAt = new Date().toISOString();
+          }
+
           const item = {
             id: doc.id,
             ...data,
-            createdAt: data.createdAt?.toDate().toISOString() || new Date().toISOString(),
+            createdAt: normalizedCreatedAt,
           } as InventoryItem;
 
           if (user.role === 'staff') {
@@ -107,15 +122,38 @@ export function useInventory() {
     const itemDocRef = doc(db, INVENTORY_COLLECTION, id);
     try {
       const batch = writeBatch(db);
+      
+      const itemSnap = await getDoc(itemDocRef);
+      if (!itemSnap.exists()) {
+          toast({ title: "Error", description: "Item not found.", variant: "destructive" });
+          return;
+      }
+      const currentItemData = itemSnap.data() as InventoryItem;
+
       const { addStock, ...restOfData } = updatedData;
       const updatePayload: any = { ...restOfData };
+      
       if (addStock && addStock !== 0) {
         updatePayload.quantity = increment(addStock);
+        
+        const newQuantity = currentItemData.quantity + addStock;
+        // Check if stock just dropped below reorder point
+        if (newQuantity <= currentItemData.reorderPoint && currentItemData.quantity > currentItemData.reorderPoint) {
+            const message = `Low stock alert: ${currentItemData.name} has only ${newQuantity} items left.`;
+            const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
+            usersSnapshot.docs.forEach(userDoc => {
+                const notificationRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+                batch.set(notificationRef, {
+                    recipientUid: userDoc.id, senderName: "System", message,
+                    link: `/inventory/${id}/edit`, read: false, createdAt: serverTimestamp(), type: 'low-stock'
+                });
+            });
+        }
       }
       
       batch.update(itemDocRef, updatePayload);
       
-      const message = `${user.username} updated item ${updatedData.name || 'details'}.`;
+      const message = `${user.username} updated item ${updatedData.name || currentItemData.name}.`;
       const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
       usersSnapshot.docs.forEach(userDoc => {
           if (userDoc.id !== user.uid) {

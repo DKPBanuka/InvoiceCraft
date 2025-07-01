@@ -1,5 +1,5 @@
 
-import type { Invoice, LineItem } from '@/lib/types';
+import type { Invoice, LineItem, Payment } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -48,9 +48,11 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
     (acc, item) => acc + item.quantity * item.price,
     0
   );
-  const discountAmount = subtotal * (invoice.discount / 100);
+  const discountAmount = subtotal * ((invoice.discount || 0) / 100);
   const tax = 0;
   const total = subtotal - discountAmount + tax;
+  const amountPaid = invoice.payments?.reduce((acc, p) => acc + p.amount, 0) || 0;
+  const amountDue = total - amountPaid;
   
   return (
     <Card className="print-container w-full rounded-xl shadow-lg bg-white">
@@ -67,13 +69,14 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
                 <p>0756438091</p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0">
             <h2 className="text-3xl font-bold font-headline text-primary">INVOICE</h2>
             <p className="text-muted-foreground mt-1">{invoice.id}</p>
              <Badge className={cn(
                 "mt-2 text-xs", 
                 invoice.status === 'Paid' && 'bg-accent text-accent-foreground',
                 invoice.status === 'Unpaid' && 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+                 invoice.status === 'Partially Paid' && 'bg-blue-200 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
                 invoice.status === 'Cancelled' && 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300'
              )}>
                 {invoice.status}
@@ -107,11 +110,11 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
           <Table>
           <TableHeader>
               <TableRow className="bg-muted/50">
-              <TableHead className="w-2/5 sm:w-auto whitespace-nowrap">Description</TableHead>
-              <TableHead className="text-center whitespace-nowrap">Qty</TableHead>
-              <TableHead className="text-right whitespace-nowrap">Unit Price</TableHead>
-              <TableHead className="whitespace-nowrap">Warranty</TableHead>
-              <TableHead className="text-right whitespace-nowrap">Amount</TableHead>
+              <TableHead className="w-2/5 sm:w-auto">Description</TableHead>
+              <TableHead className="text-center">Qty</TableHead>
+              <TableHead className="text-right">Unit Price</TableHead>
+              <TableHead>Warranty</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
               </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,12 +142,12 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
 
         <Separator className="my-4 sm:my-6" />
         <div className="flex justify-end">
-            <div className="w-full max-w-xs space-y-2 text-sm">
+            <div className="w-full max-w-sm space-y-2 text-sm">
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>Rs.{subtotal.toFixed(2)}</span>
                 </div>
-                 {invoice.discount > 0 && (
+                 {(invoice.discount || 0) > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                         <span>Discount ({invoice.discount}%)</span>
                         <span>-Rs.{discountAmount.toFixed(2)}</span>
@@ -157,10 +160,46 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
                 <Separator/>
                  <div className="flex justify-between font-bold text-base">
                     <span>Total</span>
-                    <span className="text-primary">Rs.{total.toFixed(2)}</span>
+                    <span>Rs.{total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                    <span>Amount Paid</span>
+                    <span>-Rs.{amountPaid.toFixed(2)}</span>
+                </div>
+                 <Separator/>
+                 <div className="flex justify-between font-bold text-base">
+                    <span>Amount Due</span>
+                    <span className="text-primary">Rs.{amountDue.toFixed(2)}</span>
                 </div>
             </div>
         </div>
+        
+        {invoice.payments && invoice.payments.length > 0 && (
+            <div className="mt-8 no-print">
+                <h3 className="font-semibold mb-2">Payment History</h3>
+                <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Method</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {invoice.payments.map((p: Payment) => (
+                        <TableRow key={p.id}>
+                            <TableCell>{format(new Date(p.date), 'PPP')}</TableCell>
+                            <TableCell>{p.method}</TableCell>
+                            <TableCell className="text-right">Rs.{p.amount.toFixed(2)}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                </div>
+            </div>
+        )}
+
       </CardContent>
       <CardFooter className="p-4 sm:p-6 md:p-8 pt-0">
         <div className="text-sm text-muted-foreground no-print">

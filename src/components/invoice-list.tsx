@@ -15,12 +15,15 @@ interface InvoiceListProps {
 const statusStyles: { [key in InvoiceStatus]: string } = {
     Paid: 'bg-accent text-accent-foreground border-transparent',
     Unpaid: 'bg-yellow-100 text-yellow-800 border-transparent dark:bg-yellow-900/50 dark:text-yellow-300',
+    'Partially Paid': 'bg-blue-200 text-blue-800 border-transparent dark:bg-blue-900/50 dark:text-blue-300',
     Cancelled: 'bg-gray-200 text-gray-500 border-transparent dark:bg-gray-700 dark:text-gray-300',
 };
 
 export default function InvoiceList({ invoices }: InvoiceListProps) {
   const calculateTotal = (invoice: Invoice) => {
-    return invoice.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
+    const subtotal = invoice.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
+    const discountAmount = subtotal * ((invoice.discount || 0) / 100);
+    return subtotal - discountAmount;
   };
 
   if (invoices.length === 0) {

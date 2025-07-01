@@ -15,7 +15,7 @@ import {
     SidebarFooter
 } from '@/components/ui/sidebar';
 import Logo from '../logo';
-import { Archive, FileText, LineChart, Undo2, Users, LogOut, MessageSquare } from 'lucide-react';
+import { Archive, FileText, LayoutDashboard, LineChart, LogOut, MessageSquare, Undo2, Users, Contact, Truck } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 
@@ -25,10 +25,13 @@ export default function AppSidebar() {
   const { totalUnreadCount } = useChatContext();
   
   const navItems = [
-    { href: '/', label: 'Invoices', icon: FileText, roles: ['admin', 'staff'] },
+    { href: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff'] },
+    { href: '/invoices', label: 'Invoices', icon: FileText, roles: ['admin', 'staff'] },
+    { href: '/customers', label: 'Customers', icon: Contact, roles: ['admin', 'staff'] },
     { href: '/inventory', label: 'Inventory', icon: Archive, roles: ['admin', 'staff'] },
     { href: '/returns', label: 'Returns', icon: Undo2, roles: ['admin', 'staff'] },
     { href: '/messages', label: 'Messages', icon: MessageSquare, roles: ['admin', 'staff'] },
+    { href: '/suppliers', label: 'Suppliers', icon: Truck, roles: ['admin'] },
     { href: '/reports', label: 'Reports', icon: LineChart, roles: ['admin'] },
     { href: '/users', label: 'Users', icon: Users, roles: ['admin'] },
   ];
@@ -38,6 +41,16 @@ export default function AppSidebar() {
   }
 
   const availableNavItems = navItems.filter(item => user && item.roles.includes(user.role));
+  
+  const isLinkActive = (href: string) => {
+    if (href === '/') {
+        return pathname === '/';
+    }
+    // Check if the current pathname starts with the link's href.
+    // This handles nested routes correctly (e.g., /invoices/new is active for /invoices).
+    return pathname.startsWith(href);
+  }
+
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" className="group-data-[collapsible=icon]:border-r">
@@ -50,7 +63,7 @@ export default function AppSidebar() {
                     <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton 
                             asChild
-                            isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+                            isActive={isLinkActive(item.href)}
                             tooltip={{children: item.label}}
                         >
                              <Link href={item.href}>
