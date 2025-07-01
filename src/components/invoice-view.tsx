@@ -90,7 +90,7 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
                     <p className="text-muted-foreground font-semibold">Billed To</p>
                     <p className="font-medium text-lg">{invoice.customerName}</p>
                     {invoice.customerPhone && (
-                        <p className="text-muted-foreground">{invoice.customerPhone}</p>
+                        <a href={`tel:${invoice.customerPhone}`} className="text-muted-foreground hover:underline hover:text-primary">{invoice.customerPhone}</a>
                     )}
                 </div>
                  <div>

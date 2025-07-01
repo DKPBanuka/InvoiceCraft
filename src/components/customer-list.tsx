@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, Phone, Mail } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Separator } from './ui/separator';
+import { cn } from '@/lib/utils';
 
 interface CustomerListProps {
   customers: Customer[];
@@ -82,8 +83,12 @@ export default function CustomerList({ customers, deleteCustomer }: CustomerList
             {customers.map((customer) => (
               <TableRow key={customer.id}>
                 <TableCell className="font-medium">{customer.name}</TableCell>
-                <TableCell>{customer.phone}</TableCell>
-                <TableCell>{customer.email}</TableCell>
+                <TableCell>
+                  {customer.phone ? <a href={`tel:${customer.phone}`} className="hover:underline">{customer.phone}</a> : <span className="text-muted-foreground">N/A</span>}
+                </TableCell>
+                <TableCell>
+                  {customer.email ? <a href={`mailto:${customer.email}`} className="hover:underline">{customer.email}</a> : <span className="text-muted-foreground">N/A</span>}
+                </TableCell>
                 <TableCell className="text-right space-x-2">
                   <Link href={`/customers/${customer.id}/edit`} passHref>
                     <Button variant="outline" size="icon">
@@ -110,11 +115,21 @@ export default function CustomerList({ customers, deleteCustomer }: CustomerList
           <Card key={customer.id} className="bg-white">
             <CardHeader>
               <CardTitle>{customer.name}</CardTitle>
-              <CardDescription>{customer.phone}</CardDescription>
             </CardHeader>
-            <CardContent className="text-sm">
-              {customer.email && <p>{customer.email}</p>}
-              {customer.address && <p className="text-muted-foreground mt-2">{customer.address}</p>}
+            <CardContent className="text-sm space-y-3">
+              {customer.phone && 
+                <a href={`tel:${customer.phone}`} className="flex items-center gap-2 hover:underline">
+                  <Phone className="h-4 w-4 text-muted-foreground"/> 
+                  <span>{customer.phone}</span>
+                </a>
+              }
+              {customer.email && 
+                <a href={`mailto:${customer.email}`} className="flex items-center gap-2 hover:underline">
+                  <Mail className="h-4 w-4 text-muted-foreground"/> 
+                  <span>{customer.email}</span>
+                </a>
+              }
+              {customer.address && <p className="text-muted-foreground pt-2">{customer.address}</p>}
             </CardContent>
             <Separator />
             <CardFooter className="p-2 justify-end space-x-2">

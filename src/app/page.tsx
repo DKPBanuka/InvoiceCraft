@@ -3,17 +3,16 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Loader2, Wallet, TrendingUp, FileText, ChevronLeft, ChevronRight, Package as PackageIcon, Sparkles, Archive, Users, Undo2 } from 'lucide-react';
+import { Loader2, Wallet, TrendingUp, FileText, ChevronRight, Package as PackageIcon, Sparkles, Archive, Users, Undo2 } from 'lucide-react';
 import { useInvoices } from '@/hooks/use-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/auth-context';
-import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, getDaysInMonth, startOfYear, endOfYear, eachMonthOfInterval, addYears, subYears } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Bar, BarChart, LabelList, Tooltip, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Bar, BarChart, Line, LineChart, Tooltip, XAxis, YAxis, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import type { Invoice, LineItem } from '@/lib/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useInventory } from '@/hooks/use-inventory';
 import { forecastSalesAction } from '@/app/actions';
 
@@ -31,171 +30,81 @@ const calculatePaid = (invoice: Pick<Invoice, 'payments'>): number => {
 };
 
 
-// --- New Revenue Breakdown Component ---
-function RevenueBreakdown({ invoices, inventory }: { invoices: Invoice[], inventory: any[] }) {
-    const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
-    const [currentDate, setCurrentDate] = useState(new Date());
+// --- Chart Components (copied from reports page for consistency) ---
 
-    const { chartData, topProducts, summaryStats } = useMemo(() => {
-        let filteredInvoices: Invoice[] = [];
-        let interval: { start: Date, end: Date };
-        
-        if (viewMode === 'day') {
-            interval = { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
-        } else { // month view
-            interval = { start: startOfYear(currentDate), end: endOfYear(currentDate) };
-        }
+function DashboardSalesChart({ invoices }: { invoices: Invoice[] }) {
+    const salesData = useMemo(() => {
+        const today = new Date();
+        const last30Days = eachDayOfInterval({ start: subDays(today, 29), end: today });
 
-        filteredInvoices = invoices.filter(i => {
-             if (i.status === 'Cancelled' || !i.payments || i.payments.length === 0) return false;
-             const paymentDates = i.payments.map(p => new Date(p.date));
-             return paymentDates.some(pd => pd >= interval.start && pd <= interval.end);
+        const salesByDay = invoices
+            .filter(i => i.status !== 'Cancelled')
+            .reduce((acc, invoice) => {
+                const date = format(new Date(invoice.createdAt), 'yyyy-MM-dd');
+                const total = calculateTotal(invoice);
+                acc[date] = (acc[date] || 0) + total;
+                return acc;
+            }, {} as Record<string, number>);
+
+        return last30Days.map(date => {
+            const formattedDate = format(date, 'yyyy-MM-dd');
+            return {
+                date: format(date, 'MMM d'),
+                sales: salesByDay[formattedDate] || 0,
+            };
         });
-
-        // --- Chart Data Calculation ---
-        const salesByUnit: { [key: string]: number } = {};
-        
-        filteredInvoices.flatMap(i => i.payments || []).forEach(p => {
-            const paymentDate = new Date(p.date);
-            if (paymentDate >= interval.start && paymentDate <= interval.end) {
-                const key = viewMode === 'day' ? format(paymentDate, 'd') : format(paymentDate, 'MMM');
-                salesByUnit[key] = (salesByUnit[key] || 0) + p.amount;
-            }
-        });
-        
-        let finalChartData: { name: string, revenue: number }[] = [];
-        if (viewMode === 'day') {
-            const daysInMonth = getDaysInMonth(currentDate);
-            finalChartData = Array.from({ length: daysInMonth }, (_, i) => {
-                const day = (i + 1).toString();
-                return { name: day, revenue: salesByUnit[day] || 0 };
-            });
-        } else {
-             finalChartData = eachMonthOfInterval({ start: startOfYear(currentDate), end: endOfYear(currentDate) }).map(month => {
-                const monthKey = format(month, 'MMM');
-                return { name: monthKey, revenue: salesByUnit[monthKey] || 0 };
-             });
-        }
-
-        // --- Top Products Calculation ---
-        const productSales: { [key: string]: { revenue: number, quantity: number } } = {};
-        filteredInvoices.flatMap(i => i.lineItems.filter(li => li.type === 'product')).forEach(item => {
-            const revenue = item.price * item.quantity;
-            if (!productSales[item.description]) {
-                productSales[item.description] = { revenue: 0, quantity: 0 };
-            }
-            productSales[item.description].revenue += revenue;
-            productSales[item.description].quantity += item.quantity;
-        });
-        
-        const finalTopProducts = Object.entries(productSales)
-            .sort((a, b) => b[1].revenue - a[1].revenue)
-            .slice(0, 5)
-            .map(([name, data]) => ({ name, ...data }));
-            
-        // --- Summary Stats ---
-        const totalRevenue = finalChartData.reduce((acc, item) => acc + item.revenue, 0);
-        const averageRevenue = totalRevenue > 0 ? totalRevenue / finalChartData.filter(d => d.revenue > 0).length : 0;
-
-        return {
-            chartData: finalChartData,
-            topProducts: finalTopProducts,
-            summaryStats: {
-                total: totalRevenue,
-                average: averageRevenue,
-            }
-        };
-
-    }, [invoices, currentDate, viewMode]);
-
-    const handlePrev = () => {
-        if (viewMode === 'day') setCurrentDate(subMonths(currentDate, 1));
-        else setCurrentDate(subYears(currentDate, 1));
+    }, [invoices]);
+    
+    const chartConfig = {
+        sales: { label: "Sales", color: "hsl(var(--primary))" },
     };
 
-    const handleNext = () => {
-        if (viewMode === 'day') setCurrentDate(addMonths(currentDate, 1));
-        else setCurrentDate(addYears(currentDate, 1));
-    };
-    
-    const navLabel = format(currentDate, viewMode === 'day' ? 'MMMM yyyy' : 'yyyy');
-    
     return (
-        <Card className="h-full flex flex-col">
-            <CardHeader>
-                <Tabs defaultValue="day" onValueChange={(value) => setViewMode(value as 'day' | 'month')}>
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="day">Day</TabsTrigger>
-                        <TabsTrigger value="month">Month</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-                <div className="flex items-center justify-between pt-4">
-                    <Button variant="ghost" size="icon" onClick={handlePrev}>
-                        <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <div className="font-semibold text-center">{navLabel}</div>
-                    <Button variant="ghost" size="icon" onClick={handleNext}>
-                        <ChevronRight className="h-5 w-5" />
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-6 flex-1 flex flex-col">
-                <div className="h-52 w-full">
-                     <ChartContainer config={{ revenue: { label: 'Revenue', color: 'hsl(var(--primary))' } }}>
-                        <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                             <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                             <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                             <YAxis hide={true} domain={[0, 'dataMax + 1000']} />
-                             <Tooltip
-                                cursor={{ fill: 'hsl(var(--muted))' }}
-                                content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />}
-                             />
-                             <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]}>
-                                <LabelList 
-                                    dataKey="revenue" 
-                                    position="top" 
-                                    fontSize={10} 
-                                    formatter={(value: number) => value > 0 ? formatCurrency(value) : ''} 
-                                />
-                             </Bar>
-                        </BarChart>
-                     </ChartContainer>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                        <p className="text-sm text-muted-foreground">Total Revenue</p>
-                        <p className="font-bold text-lg">{formatCurrency(summaryStats.total)}</p>
-                    </div>
-                     <div>
-                        <p className="text-sm text-muted-foreground">Average Revenue</p>
-                        <p className="font-bold text-lg">{formatCurrency(summaryStats.average)}</p>
-                    </div>
-                </div>
-
-                <div className="flex-1 flex flex-col">
-                    <h4 className="font-semibold mb-3">Top Selling Products</h4>
-                    <div className="space-y-3 flex-1">
-                        {topProducts.length > 0 ? topProducts.map(product => (
-                            <div key={product.name} className="flex items-center gap-3">
-                                <div className="p-2 bg-muted rounded-md">
-                                    <PackageIcon className="h-5 w-5 text-muted-foreground"/>
-                                </div>
-                                <div className="flex-1">
-                                    <p className="font-medium text-sm">{product.name}</p>
-                                    <p className="text-xs text-muted-foreground">{product.quantity} units sold</p>
-                                </div>
-                                <p className="font-semibold text-sm">{formatCurrency(product.revenue)}</p>
-                            </div>
-                        )) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">No product sales data for this period.</p>
-                        )}
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    )
+        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <LineChart data={salesData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} fontSize={10} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => `Rs.${value / 1000}k`} />
+                <Tooltip content={<ChartTooltipContent indicator="dot" formatter={(value) => formatCurrency(value as number)} />} />
+                <Line type="monotone" dataKey="sales" stroke="var(--color-sales)" strokeWidth={2} dot={false} />
+            </LineChart>
+        </ChartContainer>
+    );
 }
+
+function DashboardTopProductsChart({ invoices }: { invoices: Invoice[] }) {
+    const topProducts = useMemo(() => {
+        const productSales = invoices
+            .filter(i => i.status !== 'Cancelled')
+            .flatMap(i => i.lineItems.filter(li => li.type === 'product'))
+            .reduce((acc, item) => {
+                acc[item.description] = (acc[item.description] || 0) + item.quantity;
+                return acc;
+            }, {} as Record<string, number>);
+
+        return Object.entries(productSales)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([name, total]) => ({ name, total }));
+    }, [invoices]);
+
+    const chartConfig = {
+        total: { label: "Units Sold", color: "hsl(var(--primary))" },
+    };
+
+    return (
+         <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <BarChart data={topProducts} layout="vertical" margin={{ left: 10, right: 10 }}>
+                <CartesianGrid horizontal={false} />
+                <XAxis type="number" dataKey="total" hide/>
+                <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tickMargin={8} width={80} fontSize={10} />
+                <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
+                <Bar dataKey="total" fill="var(--color-total)" radius={4} />
+            </BarChart>
+         </ChartContainer>
+    );
+}
+
 
 function SalesForecast({ invoices }: { invoices: Invoice[] }) {
     const [forecast, setForecast] = useState<string | null>(null);
@@ -241,7 +150,7 @@ function SalesForecast({ invoices }: { invoices: Invoice[] }) {
         <Card className="h-full flex flex-col">
             <CardHeader>
                 <CardTitle>AI Sales Forecast</CardTitle>
-                <CardDescription>Get a 30-day sales projection based on your recent activity.</CardDescription>
+                <CardDescription>A 30-day sales projection.</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-center items-center text-center p-6">
                 {isLoading ? (
@@ -254,9 +163,9 @@ function SalesForecast({ invoices }: { invoices: Invoice[] }) {
                     <>
                         <Sparkles className="h-10 w-10 text-muted-foreground mb-4" />
                          <Button onClick={handleGenerateForecast} disabled={salesDataForForecast.length < 7}>
-                            Generate Forecast
+                            Generate
                         </Button>
-                        {salesDataForForecast.length < 7 && <p className="text-xs text-muted-foreground mt-2">At least 7 days of sales data is needed for a forecast.</p>}
+                        {salesDataForForecast.length < 7 && <p className="text-xs text-muted-foreground mt-2">Needs 7+ days of sales.</p>}
                         {error && <p className="text-xs text-destructive mt-2">{error}</p>}
                     </>
                 )}
@@ -285,10 +194,6 @@ function DashboardAnalytics({ invoices }: { invoices: Invoice[] }) {
         overdue += (total - paid);
       }
       
-      if (createdAt >= start && createdAt <= end) {
-        sent++;
-      }
-      
       if (inv.payments) {
         inv.payments.forEach(p => {
           try {
@@ -301,6 +206,11 @@ function DashboardAnalytics({ invoices }: { invoices: Invoice[] }) {
           }
         });
       }
+
+      const invoiceDate = new Date(inv.createdAt);
+        if (invoiceDate >= start && invoiceDate <= end && inv.status !== 'Cancelled') {
+            sent++;
+        }
     });
     
     return { totalOverdue: overdue, revenueThisMonth: revenue, invoicesThisMonth: sent };
@@ -446,17 +356,34 @@ export default function DashboardPage() {
 
       <DashboardAnalytics invoices={invoices} />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:items-start">
-        <div className="lg:col-span-2">
-          <RevenueBreakdown invoices={invoices} inventory={inventory} />
-        </div>
-        <div className="lg:col-span-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Link href="/reports/sales-analysis" className="group block">
+              <Card className="h-full transition-shadow duration-200 group-hover:shadow-lg">
+                  <CardHeader className="relative">
+                      <CardTitle>Sales Over Time</CardTitle>
+                      <CardDescription>Revenue from the last 30 days. Click to see details.</CardDescription>
+                      <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  </CardHeader>
+                  <CardContent>
+                      <DashboardSalesChart invoices={invoices} />
+                  </CardContent>
+              </Card>
+          </Link>
+          <Link href="/reports/product-performance" className="group block">
+              <Card className="h-full transition-shadow duration-200 group-hover:shadow-lg">
+                  <CardHeader className="relative">
+                      <CardTitle>Top Selling Products</CardTitle>
+                      <CardDescription>Top 5 products by units sold. Click to see details.</CardDescription>
+                       <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  </CardHeader>
+                  <CardContent>
+                      <DashboardTopProductsChart invoices={invoices} />
+                  </CardContent>
+              </Card>
+          </Link>
           <SalesForecast invoices={invoices} />
-        </div>
       </div>
       
     </div>
   );
 }
-
-    

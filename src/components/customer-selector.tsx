@@ -77,7 +77,7 @@ export default function CustomerSelector({ form }: CustomerSelectorProps) {
               {isLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+          <PopoverContent side="bottom" align="start" className="w-[--radix-popover-trigger-width] p-0">
             <div className="p-2">
               <Input
                 placeholder="Search customers..."

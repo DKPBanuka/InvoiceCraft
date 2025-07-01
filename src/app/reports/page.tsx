@@ -2,9 +2,10 @@
 "use client";
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, TrendingDown, AlertTriangle, TrendingUp, PackageCheck } from 'lucide-react';
+import { ArrowLeft, Loader2, TrendingDown, AlertTriangle, TrendingUp, PackageCheck, ChevronRight } from 'lucide-react';
 import { useInventory } from '@/hooks/use-inventory';
 import { useInvoices } from '@/hooks/use-invoices';
 import { differenceInDays, formatDistanceToNow, format, subDays, eachDayOfInterval } from 'date-fns';
@@ -48,23 +49,15 @@ function SalesChart({ invoices }: { invoices: Invoice[] }) {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Sales Over Time</CardTitle>
-                <CardDescription>Revenue from the last 30 days.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                    <LineChart data={salesData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                        <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => `Rs.${value / 1000}k`} />
-                        <Tooltip content={<ChartTooltipContent indicator="dot" formatter={(value) => formatCurrency(value as number)} />} />
-                        <Line type="monotone" dataKey="sales" stroke="var(--color-sales)" strokeWidth={2} dot={false} />
-                    </LineChart>
-                </ChartContainer>
-            </CardContent>
-        </Card>
+        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <LineChart data={salesData} margin={{ top: 5, right: 20, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value) => `Rs.${value / 1000}k`} />
+                <Tooltip content={<ChartTooltipContent indicator="dot" formatter={(value) => formatCurrency(value as number)} />} />
+                <Line type="monotone" dataKey="sales" stroke="var(--color-sales)" strokeWidth={2} dot={false} />
+            </LineChart>
+        </ChartContainer>
     );
 }
 
@@ -89,23 +82,15 @@ function TopProductsChart({ invoices }: { invoices: Invoice[] }) {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Top Selling Products</CardTitle>
-                <CardDescription>Top 5 products by units sold.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                 <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                    <BarChart data={topProducts} layout="vertical" margin={{ left: 10, right: 10 }}>
-                        <CartesianGrid horizontal={false} />
-                        <XAxis type="number" dataKey="total" hide/>
-                        <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tickMargin={8} width={120} />
-                        <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
-                        <Bar dataKey="total" fill="var(--color-total)" radius={4} />
-                    </BarChart>
-                 </ChartContainer>
-            </CardContent>
-        </Card>
+         <ChartContainer config={chartConfig} className="h-[250px] w-full">
+            <BarChart data={topProducts} layout="vertical" margin={{ left: 10, right: 10 }}>
+                <CartesianGrid horizontal={false} />
+                <XAxis type="number" dataKey="total" hide/>
+                <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tickMargin={8} width={120} />
+                <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
+                <Bar dataKey="total" fill="var(--color-total)" radius={4} />
+            </BarChart>
+         </ChartContainer>
     );
 }
 
@@ -279,12 +264,34 @@ function ReportsDisplay({ inventory, invoices }: { inventory: InventoryItem[], i
         </Card>
       </div>
       
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <SalesChart invoices={invoices} />
-        <TopProductsChart invoices={invoices} />
-        <LowStockItems inventory={inventory} />
-        <InventoryAging inventory={inventory} />
-      </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Link href="/reports/sales-analysis" className="group block">
+                <Card className="h-full transition-shadow duration-200 group-hover:shadow-lg">
+                    <CardHeader className="relative">
+                        <CardTitle>Sales Over Time</CardTitle>
+                        <CardDescription>Revenue from the last 30 days. Click to see details.</CardDescription>
+                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </CardHeader>
+                    <CardContent>
+                        <SalesChart invoices={invoices} />
+                    </CardContent>
+                </Card>
+            </Link>
+            <Link href="/reports/product-performance" className="group block">
+                <Card className="h-full transition-shadow duration-200 group-hover:shadow-lg">
+                    <CardHeader className="relative">
+                        <CardTitle>Top Selling Products</CardTitle>
+                        <CardDescription>Top 5 products by units sold. Click to see details.</CardDescription>
+                         <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                    </CardHeader>
+                    <CardContent>
+                        <TopProductsChart invoices={invoices} />
+                    </CardContent>
+                </Card>
+            </Link>
+            <LowStockItems inventory={inventory} />
+            <InventoryAging inventory={inventory} />
+        </div>
 
     </div>
   );
@@ -334,5 +341,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
