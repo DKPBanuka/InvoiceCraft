@@ -320,7 +320,7 @@ function DashboardAnalytics({ invoices }: { invoices: Invoice[] }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="md:col-span-1">
+          <Card>
               <CardHeader>
                   <CardTitle>Revenue (Last 30 Days)</CardTitle>
                   <CardDescription>Tracks payments received daily. Tap chart to zoom.</CardDescription>
@@ -341,9 +341,9 @@ function DashboardAnalytics({ invoices }: { invoices: Invoice[] }) {
                   </Dialog>
               </CardContent>
           </Card>
-          <div className="md:col-span-1">
+          <Card>
             <SalesForecast invoices={invoices} />
-          </div>
+          </Card>
       </div>
     </div>
   );
@@ -368,7 +368,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8 pt-20 sm:pt-24">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline tracking-tight mb-2">
           Dashboard
