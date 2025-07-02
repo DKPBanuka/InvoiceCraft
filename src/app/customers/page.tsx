@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, Users, Download, Contact } from 'lucide-react';
@@ -17,42 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 export default function CustomersPage() {
   const { customers, isLoading, deleteCustomer } = useCustomers();
   const [searchTerm, setSearchTerm] = useState('');
-  const [isContactPickerSupported, setIsContactPickerSupported] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'contacts' in navigator && 'select' in (navigator as any).contacts) {
-        setIsContactPickerSupported(true);
-    }
-  }, []);
-
-  const handleImportContact = async () => {
-    if (!isContactPickerSupported) return;
-
-    try {
-        const props = ['name', 'email', 'tel'];
-        const opts = { multiple: false };
-        const contacts = await (navigator as any).contacts.select(props, opts);
-        
-        if (contacts.length > 0) {
-            const contact = contacts[0];
-            const queryParams = new URLSearchParams();
-            if (contact.name && contact.name.length > 0) queryParams.set('name', contact.name[0]);
-            if (contact.tel && contact.tel.length > 0) queryParams.set('phone', contact.tel[0]);
-            if (contact.email && contact.email.length > 0) queryParams.set('email', contact.email[0]);
-            
-            router.push(`/customers/new?${queryParams.toString()}`);
-        }
-    } catch (error) {
-        console.error('Error picking contact:', error);
-        toast({
-            variant: "destructive",
-            title: "Could not import contact",
-            description: "Permission to access contacts may have been denied.",
-        });
-    }
-  };
 
   const filteredCustomers = customers.filter(
     (customer) =>
@@ -94,17 +60,11 @@ export default function CustomersPage() {
             Manage your customer database.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
             <Button variant="outline" onClick={handleExport}>
                 <Download className="mr-2 h-4 w-4" />
                 Export
             </Button>
-            {isContactPickerSupported && (
-                 <Button variant="outline" onClick={handleImportContact}>
-                    <Contact className="mr-2 h-4 w-4" />
-                    Import
-                </Button>
-            )}
             <Link href="/customers/new" passHref>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />

@@ -91,7 +91,7 @@ export default function AppSidebar() {
                 <SidebarMenuItem>
                      <SidebarMenuButton
                         className="h-auto justify-start p-2"
-                        variant="default"
+                        variant="ghost"
                         size="default"
                       >
                         <Avatar className="size-8">
