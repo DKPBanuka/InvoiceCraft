@@ -19,7 +19,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { useCustomers } from '@/hooks/use-customers';
 import type { Customer } from '@/lib/types';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const formSchema = z.object({
   name: z.string().min(2, 'Customer name is required'),
@@ -38,6 +38,7 @@ interface CustomerFormProps {
 export default function CustomerForm({ customer, onFinished }: CustomerFormProps) {
   const { addCustomer, updateCustomer } = useCustomers();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isEditMode = !!customer;
 
   const form = useForm<CustomerFormData>({
@@ -50,9 +51,9 @@ export default function CustomerForm({ customer, onFinished }: CustomerFormProps
             address: customer.address || '',
         }
         : { 
-            name: '', 
-            phone: '',
-            email: '',
+            name: searchParams.get('name') || '', 
+            phone: searchParams.get('phone') || '',
+            email: searchParams.get('email') || '',
             address: '',
         },
   });

@@ -18,6 +18,7 @@ import Logo from '../logo';
 import { Archive, FileText, LayoutDashboard, LineChart, LogOut, MessageSquare, Undo2, Users, Contact, Truck } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { Avatar, AvatarFallback } from '../ui/avatar';
 
 export default function AppSidebar() {
   const pathname = usePathname();
@@ -88,6 +89,21 @@ export default function AppSidebar() {
         <SidebarFooter className="hidden md:flex border-t">
             <SidebarMenu>
                 <SidebarMenuItem>
+                     <SidebarMenuButton
+                        className="h-auto justify-start p-2"
+                        variant="default"
+                        size="default"
+                      >
+                        <Avatar className="size-8">
+                            <AvatarFallback>{user.username.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col items-start text-left">
+                           <span className="font-medium">{user.username}</span>
+                           <span className="text-xs uppercase text-muted-foreground">{user.role}</span>
+                        </div>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
                     <SidebarMenuButton onClick={signOut} tooltip={{children: "Logout"}}>
                         <LogOut />
                         <span>Logout</span>
@@ -99,8 +115,13 @@ export default function AppSidebar() {
         {/* Mobile Footer */}
         <SidebarFooter className="md:hidden flex flex-col gap-4 border-t pt-4">
              <div className="flex items-center gap-2 px-2">
-                <p className="text-sm font-medium">{user.username}</p>
-                <Badge variant="outline" className="uppercase text-xs">{user.role}</Badge>
+                <Avatar className="size-8">
+                    <AvatarFallback>{user.username.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                    <p className="text-sm font-medium">{user.username}</p>
+                    <Badge variant="outline" className="uppercase text-xs">{user.role}</Badge>
+                </div>
             </div>
              <Button variant="ghost" onClick={signOut} className="w-full justify-start">
                 <LogOut className="mr-2 h-4 w-4" />

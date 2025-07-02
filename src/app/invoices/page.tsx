@@ -18,7 +18,12 @@ import { exportToCsv } from '@/lib/utils';
 
 const calculateTotal = (invoice: Invoice): number => {
   const subtotal = invoice.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
-  const discountAmount = subtotal * ((invoice.discount || 0) / 100);
+  let discountAmount = 0;
+  if (invoice.discountType === 'percentage') {
+      discountAmount = subtotal * ((invoice.discountValue || 0) / 100);
+  } else if (invoice.discountType === 'fixed') {
+      discountAmount = invoice.discountValue || 0;
+  }
   return subtotal - discountAmount;
 };
 

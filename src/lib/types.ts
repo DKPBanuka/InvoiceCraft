@@ -76,7 +76,8 @@ export interface Invoice {
   createdAt: string; // ISO string
   lineItems: LineItem[];
   payments?: Payment[];
-  discount: number; // Percentage discount
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
   createdBy: string; // User UID
   createdByName: string;
 }

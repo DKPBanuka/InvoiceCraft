@@ -79,6 +79,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (user && user.role !== 'admin' && pathname.startsWith('/reports')) {
           router.push('/');
         }
+        if (user && user.role !== 'admin' && pathname.startsWith('/suppliers')) {
+          router.push('/');
+        }
       }
   }, [user, isLoading, pathname, router]);
 

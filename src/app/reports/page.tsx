@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -306,13 +306,14 @@ export default function ReportsPage() {
 
   const isLoading = inventoryLoading || authLoading || invoicesLoading;
 
-  if (isLoading) {
-    return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  }
-  
-  if (user?.role !== 'admin') {
+  useEffect(() => {
+    if (!authLoading && user?.role !== 'admin') {
       router.push('/');
-      return null;
+    }
+  }, [user, authLoading, router]);
+
+  if (isLoading || !user || user.role !== 'admin') {
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   return (
@@ -331,13 +332,7 @@ export default function ReportsPage() {
           Back
         </Button>
       </div>
-      {isLoading ? (
-         <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-         </div>
-      ) : (
-        <ReportsDisplay inventory={inventory} invoices={invoices} />
-      )}
+      <ReportsDisplay inventory={inventory} invoices={invoices} />
     </div>
   );
 }

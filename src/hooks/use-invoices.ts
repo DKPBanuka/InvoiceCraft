@@ -8,16 +8,21 @@ import type { Invoice, InvoiceStatus, Payment, InventoryItem } from '@/lib/types
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, writeBatch, query, orderBy, limit, getDocs, increment, where, arrayUnion, getDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
-import { invoiceServerSchema, paymentServerSchema } from '@/lib/schemas';
+import { invoiceServerSchema, invoiceServerObjectSchema, paymentServerSchema } from '@/lib/schemas';
 
 const INVOICES_COLLECTION = 'invoices';
 const INVENTORY_COLLECTION = 'inventory';
 const USERS_COLLECTION = 'users';
 const NOTIFICATIONS_COLLECTION = 'notifications';
 
-const calculateTotal = (invoice: Pick<Invoice, 'lineItems' | 'discount'>): number => {
+const calculateTotal = (invoice: Pick<Invoice, 'lineItems' | 'discountType' | 'discountValue'>): number => {
     const subtotal = invoice.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
-    const discountAmount = subtotal * ((invoice.discount || 0) / 100);
+    let discountAmount = 0;
+    if (invoice.discountType === 'percentage') {
+        discountAmount = subtotal * ((invoice.discountValue || 0) / 100);
+    } else if (invoice.discountType === 'fixed') {
+        discountAmount = invoice.discountValue || 0;
+    }
     return subtotal - discountAmount;
 };
 
@@ -244,7 +249,7 @@ export function useInvoices() {
     const originalInvoice = invoices.find(inv => inv.id === id);
     if (!originalInvoice) return;
 
-    const validationResult = invoiceServerSchema.partial().safeParse(updatedData);
+    const validationResult = invoiceServerObjectSchema.partial().safeParse(updatedData);
     if (!validationResult.success) {
         const errorMessage = validationResult.error.errors.map(e => e.message).join('\n');
         toast({ title: "Invalid Invoice Data", description: errorMessage, variant: "destructive" });

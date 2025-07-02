@@ -48,16 +48,25 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
     (acc, item) => acc + item.quantity * item.price,
     0
   );
-  const discountAmount = subtotal * ((invoice.discount || 0) / 100);
-  const tax = 0;
-  const total = subtotal - discountAmount + tax;
+  
+  let discountAmount = 0;
+  let discountLabel = '';
+  if (invoice.discountType === 'percentage') {
+      discountAmount = subtotal * ((invoice.discountValue || 0) / 100);
+      discountLabel = `Discount (${invoice.discountValue}%)`;
+  } else if (invoice.discountType === 'fixed') {
+      discountAmount = invoice.discountValue || 0;
+      discountLabel = 'Discount';
+  }
+
+  const total = subtotal - discountAmount;
   const amountPaid = invoice.payments?.reduce((acc, p) => acc + p.amount, 0) || 0;
   const amountDue = total - amountPaid;
   
   return (
     <Card className="print-container w-full rounded-xl shadow-lg bg-white">
       <CardHeader className="p-4 sm:p-6 md:p-8">
-        <div className="flex justify-between items-start gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
           <div>
             <div className="no-print">
               <Logo />
@@ -69,18 +78,20 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
                 <p>0756438091</p>
             </div>
           </div>
-          <div className="text-right flex-shrink-0">
+          <div className="text-left sm:text-right flex-shrink-0">
             <h2 className="text-3xl font-bold font-headline text-primary">INVOICE</h2>
             <p className="text-muted-foreground mt-1">{invoice.id}</p>
-             <Badge className={cn(
-                "mt-2 text-xs", 
-                invoice.status === 'Paid' && 'bg-accent text-accent-foreground',
-                invoice.status === 'Unpaid' && 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-                 invoice.status === 'Partially Paid' && 'bg-blue-200 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-                invoice.status === 'Cancelled' && 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300'
-             )}>
-                {invoice.status}
-            </Badge>
+            <div className="mt-2">
+                 <Badge className={cn(
+                    "text-xs", 
+                    invoice.status === 'Paid' && 'bg-accent text-accent-foreground',
+                    invoice.status === 'Unpaid' && 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+                    invoice.status === 'Partially Paid' && 'bg-blue-200 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+                    invoice.status === 'Cancelled' && 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300'
+                 )}>
+                    {invoice.status}
+                </Badge>
+            </div>
           </div>
         </div>
         <Separator className="my-4 sm:my-6" />
@@ -147,17 +158,13 @@ export default function InvoiceView({ invoice }: InvoiceViewProps) {
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>Rs.{subtotal.toFixed(2)}</span>
                 </div>
-                 {(invoice.discount || 0) > 0 && (
+                 {(invoice.discountValue || 0) > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                        <span>Discount ({invoice.discount}%)</span>
+                        <span>{discountLabel}</span>
                         <span>-Rs.{discountAmount.toFixed(2)}</span>
                     </div>
                  )}
-                 <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tax (0%)</span>
-                    <span>Rs.{tax.toFixed(2)}</span>
-                </div>
-                <Separator/>
+                 <Separator/>
                  <div className="flex justify-between font-bold text-base">
                     <span>Total</span>
                     <span>Rs.{total.toFixed(2)}</span>

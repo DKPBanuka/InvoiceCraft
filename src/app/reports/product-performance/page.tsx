@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -132,13 +132,14 @@ export default function ProductPerformancePage() {
 
     const isLoading = inventoryLoading || authLoading || invoicesLoading;
 
-    if (isLoading) {
+    useEffect(() => {
+        if (!authLoading && user?.role !== 'admin') {
+            router.push('/');
+        }
+    }, [user, authLoading, router]);
+
+    if (isLoading || !user || user.role !== 'admin') {
         return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    }
-    
-    if (user?.role !== 'admin') {
-        router.push('/');
-        return null;
     }
 
     return (
@@ -157,13 +158,7 @@ export default function ProductPerformancePage() {
                 Back
                 </Button>
             </div>
-            {isLoading ? (
-                <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-            ) : (
-                <ProductPerformanceReport inventory={inventory} invoices={invoices} />
-            )}
+            <ProductPerformanceReport inventory={inventory} invoices={invoices} />
         </div>
     );
 }

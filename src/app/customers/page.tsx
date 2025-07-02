@@ -1,9 +1,10 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Search, Users, Download } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, Search, Users, Download, Contact } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCustomers } from '@/hooks/use-customers';
 import CustomerList from '@/components/customer-list';
@@ -11,10 +12,47 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { exportToCsv } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CustomersPage() {
   const { customers, isLoading, deleteCustomer } = useCustomers();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isContactPickerSupported, setIsContactPickerSupported] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'contacts' in navigator && 'select' in (navigator as any).contacts) {
+        setIsContactPickerSupported(true);
+    }
+  }, []);
+
+  const handleImportContact = async () => {
+    if (!isContactPickerSupported) return;
+
+    try {
+        const props = ['name', 'email', 'tel'];
+        const opts = { multiple: false };
+        const contacts = await (navigator as any).contacts.select(props, opts);
+        
+        if (contacts.length > 0) {
+            const contact = contacts[0];
+            const queryParams = new URLSearchParams();
+            if (contact.name && contact.name.length > 0) queryParams.set('name', contact.name[0]);
+            if (contact.tel && contact.tel.length > 0) queryParams.set('phone', contact.tel[0]);
+            if (contact.email && contact.email.length > 0) queryParams.set('email', contact.email[0]);
+            
+            router.push(`/customers/new?${queryParams.toString()}`);
+        }
+    } catch (error) {
+        console.error('Error picking contact:', error);
+        toast({
+            variant: "destructive",
+            title: "Could not import contact",
+            description: "Permission to access contacts may have been denied.",
+        });
+    }
+  };
 
   const filteredCustomers = customers.filter(
     (customer) =>
@@ -61,6 +99,12 @@ export default function CustomersPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Export
             </Button>
+            {isContactPickerSupported && (
+                 <Button variant="outline" onClick={handleImportContact}>
+                    <Contact className="mr-2 h-4 w-4" />
+                    Import
+                </Button>
+            )}
             <Link href="/customers/new" passHref>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />

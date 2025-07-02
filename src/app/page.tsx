@@ -19,9 +19,14 @@ import { forecastSalesAction } from '@/app/actions';
 const formatCurrency = (amount: number) => `Rs.${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // --- Helper Functions ---
-const calculateTotal = (invoice: Pick<Invoice, 'lineItems' | 'discount'>): number => {
+const calculateTotal = (invoice: Pick<Invoice, 'lineItems' | 'discountType' | 'discountValue'>): number => {
   const subtotal = invoice.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
-  const discountAmount = subtotal * ((invoice.discount || 0) / 100);
+  let discountAmount = 0;
+  if (invoice.discountType === 'percentage') {
+      discountAmount = subtotal * ((invoice.discountValue || 0) / 100);
+  } else if (invoice.discountType === 'fixed') {
+      discountAmount = invoice.discountValue || 0;
+  }
   return subtotal - discountAmount;
 };
 

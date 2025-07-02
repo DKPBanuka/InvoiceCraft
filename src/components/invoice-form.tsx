@@ -4,7 +4,7 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Loader2, ChevronsUpDown, Percent, Package, Wrench } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronsUpDown, Package, Wrench } from 'lucide-react';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -130,7 +130,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
       customerName: z.string().min(1, 'Customer name is required'),
       customerPhone: z.string().optional(),
       status: z.enum(['Paid', 'Unpaid', 'Partially Paid']),
-      discount: z.coerce.number().min(0, "Discount can't be negative").max(100, "Discount can't be over 100%"),
+      discountType: z.enum(['percentage', 'fixed']).default('percentage'),
+      discountValue: z.coerce.number().min(0, "Discount value can't be negative").default(0),
       initialPayment: z.coerce.number().optional(),
       lineItems: z
         .array(
@@ -181,21 +182,33 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
           });
         }),
     }).superRefine((data, ctx) => {
-        if (isEditMode) {
-          // This validation is only for new invoices with an initial payment.
-          return;
+        if (data.discountType === 'percentage' && data.discountValue > 100) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Percentage discount cannot be over 100%",
+                path: ['discountValue'],
+            });
+        }
+        
+        const subtotal = data.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
+        let discountAmount = 0;
+        if (data.discountType === 'percentage') {
+            discountAmount = subtotal * (data.discountValue / 100);
+        } else {
+            discountAmount = data.discountValue;
         }
 
-        const watchLineItems = data.lineItems;
-        const watchDiscount = data.discount;
-        const subtotal = watchLineItems.reduce(
-            (acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0),
-            0
-        );
-        const discountAmount = subtotal * ((Number(watchDiscount) || 0) / 100);
+        if (data.discountType === 'fixed' && data.discountValue > subtotal) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Fixed discount cannot be more than subtotal of Rs.${subtotal.toFixed(2)}`,
+                path: ['discountValue'],
+            });
+        }
+        
         const totalAmount = subtotal - discountAmount;
 
-        if (data.status === 'Partially Paid') {
+        if (!isEditMode && data.status === 'Partially Paid') {
             if (!data.initialPayment || data.initialPayment <= 0) {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
@@ -222,7 +235,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
         ? {
             ...invoice,
             customerPhone: invoice.customerPhone || '',
-            discount: invoice.discount || 0,
+            discountType: invoice.discountType || 'percentage',
+            discountValue: invoice.discountValue || 0,
             initialPayment: 0
           }
         : {
@@ -230,7 +244,8 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
             customerPhone: '',
             status: 'Paid',
             lineItems: [{ type: 'product', description: '', quantity: 1, price: 0, warrantyPeriod: 'N/A' }],
-            discount: 0,
+            discountType: 'percentage',
+            discountValue: 0,
             initialPayment: 0,
         },
   });
@@ -254,15 +269,26 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
   }, [inventory, categoryFilter]);
 
   const watchLineItems = form.watch('lineItems');
-  const watchDiscount = form.watch('discount');
+  const watchDiscountType = form.watch('discountType');
+  const watchDiscountValue = form.watch('discountValue');
   const watchStatus = form.watch('status');
   
-  const subtotal = watchLineItems.reduce(
-    (acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0),
-    0
-  );
-  const discountAmount = subtotal * ((Number(watchDiscount) || 0) / 100);
-  const totalAmount = subtotal - discountAmount;
+  const { subtotal, discountAmount, totalAmount } = useMemo(() => {
+    const sub = watchLineItems.reduce(
+        (acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.price) || 0),
+        0
+    );
+
+    let discAmt = 0;
+    if (watchDiscountType === 'percentage') {
+        discAmt = sub * ((Number(watchDiscountValue) || 0) / 100);
+    } else if (watchDiscountType === 'fixed') {
+        discAmt = Number(watchDiscountValue) || 0;
+    }
+
+    const total = sub - discAmt;
+    return { subtotal: sub, discountAmount: discAmt, totalAmount: total };
+  }, [watchLineItems, watchDiscountType, watchDiscountValue]);
 
   function onSubmit(values: InvoiceFormData) {
     if (isEditMode && invoice) {
@@ -455,26 +481,48 @@ export default function InvoiceForm({ invoice }: InvoiceFormProps) {
                     <CardHeader>
                       <CardTitle>Discount</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-6 pt-0">
+                    <CardContent className="p-6 pt-0 space-y-4">
                         <FormField
                             control={form.control}
-                            name="discount"
+                            name="discountType"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Discount (%)</FormLabel>
-                                    <div className="relative">
-                                        <FormControl>
-                                            <Input 
-                                                type="number" 
-                                                step="0.01"
-                                                placeholder="0" 
-                                                {...field} 
-                                                disabled={user?.role === 'staff'}
-                                                className="pl-8"
-                                            />
-                                        </FormControl>
-                                        <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    </div>
+                                    <FormLabel>Discount Type</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup
+                                            onValueChange={field.onChange}
+                                            defaultValue={field.value}
+                                            className="flex space-x-4"
+                                            disabled={user?.role === 'staff'}
+                                        >
+                                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                                <FormControl><RadioGroupItem value="percentage" id="percentage" /></FormControl>
+                                                <Label htmlFor="percentage" className="font-normal">Percentage (%)</Label>
+                                            </FormItem>
+                                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                                <FormControl><RadioGroupItem value="fixed" id="fixed" /></FormControl>
+                                                <Label htmlFor="fixed" className="font-normal">Fixed (Rs.)</Label>
+                                            </FormItem>
+                                        </RadioGroup>
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="discountValue"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Discount Value</FormLabel>
+                                    <FormControl>
+                                        <Input 
+                                            type="number" 
+                                            step="0.01"
+                                            placeholder="0" 
+                                            {...field} 
+                                            disabled={user?.role === 'staff'}
+                                        />
+                                    </FormControl>
                                     {user?.role === 'staff' && <p className="text-xs text-muted-foreground mt-2">Discount can only be applied by an Admin.</p>}
                                     <FormMessage />
                                 </FormItem>

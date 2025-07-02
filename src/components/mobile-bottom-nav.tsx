@@ -37,7 +37,7 @@ export default function MobileBottomNav() {
   }
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t border-border">
+    <nav className="md:hidden fixed bottom-0 left-0 z-50 w-full h-16 bg-background border-t border-border no-print">
       <div className="flex h-full mx-auto font-medium">
         {availableNavItems.map((item) => (
           <Link

@@ -36,7 +36,7 @@ interface CustomerListProps {
 function DeleteDialog({ customer, deleteCustomer, asChild, children }: { customer: Customer; deleteCustomer: (id: string) => void; asChild?: boolean; children: React.ReactNode; }) {
   return (
     <AlertDialog>
-      <AlertDialogTrigger asChild={asChild}>
+      <AlertDialogTrigger asChild={asChild} onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
         {children}
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -110,41 +110,43 @@ export default function CustomerList({ customers, deleteCustomer }: CustomerList
       </div>
 
       {/* Mobile View: Cards */}
-      <div className="md:hidden space-y-4">
+      <div className="md:hidden space-y-3">
         {customers.map((customer) => (
-          <Card key={customer.id} className="bg-white">
-            <CardHeader>
-              <CardTitle>{customer.name}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-3">
-              {customer.phone && 
-                <a href={`tel:${customer.phone}`} className="flex items-center gap-2 hover:underline">
-                  <Phone className="h-4 w-4 text-muted-foreground"/> 
-                  <span>{customer.phone}</span>
-                </a>
-              }
-              {customer.email && 
-                <a href={`mailto:${customer.email}`} className="flex items-center gap-2 hover:underline">
-                  <Mail className="h-4 w-4 text-muted-foreground"/> 
-                  <span>{customer.email}</span>
-                </a>
-              }
-              {customer.address && <p className="text-muted-foreground pt-2">{customer.address}</p>}
-            </CardContent>
-            <Separator />
-            <CardFooter className="p-2 justify-end space-x-2">
-              <Link href={`/customers/${customer.id}/edit`} passHref>
-                <Button variant="outline" size="sm">
-                  <Edit className="mr-2 h-4 w-4" /> Edit
-                </Button>
-              </Link>
-              <DeleteDialog customer={customer} deleteCustomer={deleteCustomer} asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
-                </Button>
-              </DeleteDialog>
-            </CardFooter>
-          </Card>
+          <div key={customer.id} className="relative">
+            <Link href={`/customers/${customer.id}/edit`} className="block group">
+                <Card className="bg-white transition-shadow group-hover:shadow-md">
+                    <CardContent className="p-4">
+                        <p className="font-semibold text-base pr-10">{customer.name}</p>
+                        <div className="text-sm text-muted-foreground mt-2 space-y-1">
+                            {customer.phone && (
+                            <div className="flex items-center gap-2">
+                                <Phone className="h-4 w-4" />
+                                <span>{customer.phone}</span>
+                            </div>
+                            )}
+                            {customer.email && (
+                            <div className="flex items-center gap-2">
+                                <Mail className="h-4 w-4" />
+                                <span>{customer.email}</span>
+                            </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </Link>
+            <div className="absolute top-2 right-2">
+                <DeleteDialog customer={customer} deleteCustomer={deleteCustomer} asChild>
+                    <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Delete Customer</span>
+                    </Button>
+                </DeleteDialog>
+            </div>
+          </div>
         ))}
       </div>
     </>

@@ -58,12 +58,31 @@ export const lineItemServerSchema = z.object({
     warrantyPeriod: z.string().min(1, { message: "Warranty period is required." }),
 });
 
-export const invoiceServerSchema = z.object({
+export const invoiceServerObjectSchema = z.object({
     customerId: z.string().optional(),
     customerName: z.string().min(1, { message: "Customer name is required." }),
     customerPhone: z.string().optional(),
-    discount: z.number().min(0).max(100),
+    discountType: z.enum(['percentage', 'fixed']).default('percentage'),
+    discountValue: z.coerce.number().min(0, "Discount value can't be negative").default(0),
     lineItems: z.array(lineItemServerSchema).min(1, { message: "An invoice must have at least one line item." }),
+});
+
+export const invoiceServerSchema = invoiceServerObjectSchema.superRefine((data, ctx) => {
+    if (data.discountType === 'percentage' && data.discountValue > 100) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Percentage discount cannot be over 100%",
+            path: ['discountValue'],
+        });
+    }
+    const subtotal = data.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
+    if (data.discountType === 'fixed' && data.discountValue > subtotal) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Fixed discount cannot be more than subtotal of Rs.${subtotal.toFixed(2)}`,
+            path: ['discountValue'],
+        });
+    }
 });
 
 export const paymentServerSchema = z.object({
