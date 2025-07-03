@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import type { InventoryItem } from '@/lib/types';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, increment, writeBatch, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, serverTimestamp, increment, writeBatch, query, where, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { inventoryItemServerSchema } from '@/lib/schemas';
 import * as z from 'zod';
@@ -13,6 +13,8 @@ import * as z from 'zod';
 const INVENTORY_COLLECTION = 'inventory';
 const USERS_COLLECTION = 'users';
 const NOTIFICATIONS_COLLECTION = 'notifications';
+const STOCK_MOVEMENTS_COLLECTION = 'stockMovements';
+
 
 export function useInventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -96,6 +98,18 @@ export function useInventory() {
         quantity: quantity || 0,
         createdAt: serverTimestamp(),
       });
+
+      if (quantity && quantity > 0) {
+        const movementRef = doc(collection(db, STOCK_MOVEMENTS_COLLECTION));
+        batch.set(movementRef, {
+            inventoryItemId: newDocRef.id,
+            type: 'addition',
+            quantity: quantity,
+            referenceId: 'Initial Stock',
+            createdAt: serverTimestamp(),
+            createdByName: user.username,
+        });
+      }
       
       const message = `${user.username} added a new item: ${itemData.name}.`;
       const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));
@@ -162,8 +176,19 @@ export function useInventory() {
       if (addStock && addStock !== 0) {
         updatePayload.quantity = increment(addStock);
         
+        if (addStock > 0) {
+          const movementRef = doc(collection(db, STOCK_MOVEMENTS_COLLECTION));
+          batch.set(movementRef, {
+              inventoryItemId: id,
+              type: 'addition',
+              quantity: addStock,
+              referenceId: 'Manual Stock Update',
+              createdAt: serverTimestamp(),
+              createdByName: user.username,
+          });
+        }
+        
         const newQuantity = currentItemData.quantity + addStock;
-        // Check if stock just dropped below reorder point
         if (newQuantity <= currentItemData.reorderPoint && currentItemData.quantity > currentItemData.reorderPoint) {
             const message = `Low stock alert: ${currentItemData.name} has only ${newQuantity} items left.`;
             const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), where('role', '==', 'admin')));

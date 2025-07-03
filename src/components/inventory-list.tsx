@@ -20,19 +20,8 @@ import {
   CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2 } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
@@ -49,33 +38,7 @@ const statusStyles: { [key in ItemStatus]: string } = {
     'For Repair': 'bg-blue-200 text-blue-800 border-transparent dark:bg-blue-900/50 dark:text-blue-300',
 };
 
-
-function DeleteDialog({ item, deleteInventoryItem, asChild, children }: { item: InventoryItem; deleteInventoryItem: (id: string) => void; asChild?: boolean; children: React.ReactNode; }) {
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild={asChild}>
-        {children}
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete '{item.name}'. This may also affect existing invoices that reference this item.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={() => deleteInventoryItem(item.id)} className="bg-destructive hover:bg-destructive/90">
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-
-export default function InventoryList({ inventory, deleteInventoryItem }: InventoryListProps) {
+export default function InventoryList({ inventory }: InventoryListProps) {
   const { user } = useAuth();
 
   if (inventory.length === 0) {
@@ -103,7 +66,7 @@ export default function InventoryList({ inventory, deleteInventoryItem }: Invent
               {user?.role === 'admin' && <TableHead className="text-right">Cost Price</TableHead>}
               <TableHead className="text-right">Stock</TableHead>
               {user?.role === 'admin' && <TableHead className="text-right">Stock Value (Cost)</TableHead>}
-              {user?.role === 'admin' && <TableHead className="w-[140px] text-right">Actions</TableHead>}
+              <TableHead className="w-[100px] text-right"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,22 +86,13 @@ export default function InventoryList({ inventory, deleteInventoryItem }: Invent
                     </Badge>
                 </TableCell>
                 {user?.role === 'admin' && <TableCell className="text-right">Rs.{(item.costPrice * item.quantity).toFixed(2)}</TableCell>}
-                {user?.role === 'admin' && (
-                    <TableCell className="text-right space-x-2">
-                    <Link href={`/inventory/${item.id}/edit`} passHref>
-                        <Button variant="outline" size="icon">
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit Item</span>
+                <TableCell className="text-right">
+                   <Link href={`/inventory/${item.id}`} passHref>
+                        <Button variant="outline" size="sm">
+                            View <ChevronRight className="h-4 w-4 -mr-1" />
                         </Button>
                     </Link>
-                    <DeleteDialog item={item} deleteInventoryItem={deleteInventoryItem} asChild>
-                        <Button variant="destructive" size="icon">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete Item</span>
-                        </Button>
-                    </DeleteDialog>
-                    </TableCell>
-                )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -148,58 +102,37 @@ export default function InventoryList({ inventory, deleteInventoryItem }: Invent
       {/* Mobile View: Cards */}
       <div className="md:hidden space-y-4">
         {inventory.map((item) => (
-          <Card key={item.id} className="bg-white">
-            <CardHeader>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle>{item.name}</CardTitle>
-                        <CardDescription>{item.brand} / {item.category}</CardDescription>
-                    </div>
-                    <Badge className={cn('text-xs', statusStyles[item.status])}>{item.status}</Badge>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Selling Price</span>
-                    <span className="font-medium">Rs.{item.price.toFixed(2)}</span>
-                </div>
-                {user?.role === 'admin' && (
-                    <>
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cost Price</span>
-                        <span className="font-medium">Rs.{item.costPrice.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">Stock Value (Cost)</span>
-                        <span className="font-medium">Rs.{(item.costPrice * item.quantity).toFixed(2)}</span>
-                    </div>
-                    </>
-                )}
-                <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Stock</span>
-                     <Badge variant={isLowStock(item) ? "destructive" : "secondary"}>
-                        {item.quantity} in stock
-                    </Badge>
-                </div>
-            </CardContent>
-            {user?.role === 'admin' && (
-                <>
-                <Separator />
-                <CardFooter className="p-2 justify-end space-x-2">
-                <Link href={`/inventory/${item.id}/edit`} passHref>
-                    <Button variant="outline" size="sm">
-                    <Edit className="mr-2 h-4 w-4" /> Edit
-                    </Button>
-                </Link>
-                <DeleteDialog item={item} deleteInventoryItem={deleteInventoryItem} asChild>
-                    <Button variant="destructive" size="sm">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </Button>
-                </DeleteDialog>
-                </CardFooter>
-                </>
-            )}
-          </Card>
+          <Link href={`/inventory/${item.id}`} key={item.id} className="group block">
+            <Card className="bg-white transition-shadow duration-200 group-hover:shadow-md">
+              <CardHeader>
+                  <div className="flex justify-between items-start">
+                      <div>
+                          <CardTitle>{item.name}</CardTitle>
+                          <CardDescription>{item.brand} / {item.category}</CardDescription>
+                      </div>
+                      <Badge className={cn('text-xs', statusStyles[item.status])}>{item.status}</Badge>
+                  </div>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                      <span className="text-muted-foreground">Selling Price</span>
+                      <span className="font-medium">Rs.{item.price.toFixed(2)}</span>
+                  </div>
+                  {user?.role === 'admin' && (
+                      <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cost Price</span>
+                          <span className="font-medium">Rs.{item.costPrice.toFixed(2)}</span>
+                      </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Stock</span>
+                       <Badge variant={isLowStock(item) ? "destructive" : "secondary"}>
+                          {item.quantity} in stock
+                      </Badge>
+                  </div>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
     </>

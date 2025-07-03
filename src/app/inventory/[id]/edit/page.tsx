@@ -6,31 +6,20 @@ import { useParams, useRouter } from 'next/navigation';
 import { useInventory } from '@/hooks/use-inventory';
 import InventoryForm from '@/components/inventory-form';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, Trash2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import type { InventoryItem } from '@/lib/types';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { useAuth } from '@/contexts/auth-context';
 
 export default function EditInventoryItemPage() {
   const router = useRouter();
   const params = useParams();
-  const { getInventoryItem, isLoading: inventoryLoading, deleteInventoryItem } = useInventory();
+  const { getInventoryItem, isLoading: inventoryLoading } = useInventory();
   const { user, isLoading: authLoading } = useAuth();
   const [item, setItem] = useState<InventoryItem | undefined>(undefined);
+  
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const isLoading = inventoryLoading || authLoading;
-
-  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   
   useEffect(() => {
     if (user?.role !== 'admin') {
@@ -39,7 +28,7 @@ export default function EditInventoryItemPage() {
   }, [user, router]);
 
   useEffect(() => {
-    if (!isLoading && id) {
+    if (!inventoryLoading && id) {
       const foundItem = getInventoryItem(id);
       if (foundItem) {
         setItem(foundItem);
@@ -47,14 +36,7 @@ export default function EditInventoryItemPage() {
         router.push('/inventory');
       }
     }
-  }, [id, getInventoryItem, isLoading, router]);
-
-  const handleDelete = () => {
-    if (id) {
-        deleteInventoryItem(id);
-        router.push('/inventory');
-    }
-  };
+  }, [id, getInventoryItem, inventoryLoading, router]);
 
   if (isLoading || !item) {
     return (
@@ -75,34 +57,10 @@ export default function EditInventoryItemPage() {
               Update the details for '{item.name}'.
             </p>
         </div>
-        <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive">
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the item
-                    from your inventory. This may also affect existing invoices that reference this item.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-        </div>
+        <Button variant="outline" onClick={() => router.push(`/inventory/${id}`)}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to View
+        </Button>
       </div>
       <InventoryForm item={item} />
     </div>

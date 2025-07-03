@@ -103,6 +103,8 @@ function DetailedSalesAnalysis({ invoices }: { invoices: Invoice[] }) {
     
     const navLabel = format(currentDate, viewMode === 'day' ? 'MMMM yyyy' : 'yyyy');
     
+    const chartWidth = viewMode === 'day' ? chartData.length * 40 : '100%';
+
     return (
         <Card>
             <CardHeader>
@@ -123,26 +125,28 @@ function DetailedSalesAnalysis({ invoices }: { invoices: Invoice[] }) {
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="h-64 w-full">
-                     <ChartContainer config={{ revenue: { label: 'Revenue', color: 'hsl(var(--primary))' } }}>
-                        <BarChart data={chartData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                             <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                             <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                             <YAxis hide={true} domain={[0, 'dataMax + 1000']} />
-                             <Tooltip
-                                cursor={{ fill: 'hsl(var(--muted))' }}
-                                content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />}
-                             />
-                             <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]}>
-                                <LabelList 
-                                    dataKey="revenue" 
-                                    position="top" 
-                                    fontSize={10} 
-                                    formatter={(value: number) => value > 0 ? formatCurrency(value) : ''} 
-                                />
-                             </Bar>
-                        </BarChart>
-                     </ChartContainer>
+                 <div className="h-64 w-full overflow-x-auto overflow-y-hidden">
+                    <div style={{ width: typeof chartWidth === 'string' ? chartWidth : `${chartWidth}px`, height: '100%' }}>
+                         <ChartContainer config={{ revenue: { label: 'Revenue', color: 'hsl(var(--primary))' } }} className="h-full w-full [aspect-ratio:auto]">
+                            <BarChart data={chartData} margin={{ top: 20, right: 10, left: 10, bottom: 0 }}>
+                                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                                 <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} interval={0} />
+                                 <YAxis hide={true} domain={[0, 'dataMax + 1000']} />
+                                 <Tooltip
+                                    cursor={{ fill: 'hsl(var(--muted))' }}
+                                    content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />}
+                                 />
+                                 <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]}>
+                                    <LabelList 
+                                        dataKey="revenue" 
+                                        position="top" 
+                                        fontSize={10} 
+                                        formatter={(value: number) => value > 0 ? formatCurrency(value) : ''} 
+                                    />
+                                 </Bar>
+                            </BarChart>
+                         </ChartContainer>
+                    </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-center">
                     <div>

@@ -14,6 +14,7 @@ const INVOICES_COLLECTION = 'invoices';
 const INVENTORY_COLLECTION = 'inventory';
 const USERS_COLLECTION = 'users';
 const NOTIFICATIONS_COLLECTION = 'notifications';
+const STOCK_MOVEMENTS_COLLECTION = 'stockMovements';
 
 const calculateTotal = (invoice: Pick<Invoice, 'lineItems' | 'discountType' | 'discountValue'>): number => {
     const subtotal = invoice.lineItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
@@ -194,8 +195,20 @@ export function useInvoices() {
       batch.set(invoiceDocRef, cleanedData);
 
       for (const lineItem of newInvoiceData.lineItems) {
-        if (lineItem.inventoryItemId) {
+        if (lineItem.inventoryItemId && lineItem.type === 'product') {
             const itemDocRef = doc(db, INVENTORY_COLLECTION, lineItem.inventoryItemId);
+            batch.update(itemDocRef, { quantity: increment(-lineItem.quantity) });
+            
+            const movementRef = doc(collection(db, STOCK_MOVEMENTS_COLLECTION));
+            batch.set(movementRef, {
+                inventoryItemId: lineItem.inventoryItemId,
+                type: 'sale',
+                quantity: lineItem.quantity,
+                referenceId: invoiceId,
+                createdAt: serverTimestamp(),
+                createdByName: user.username,
+            });
+
             const itemSnap = await getDoc(itemDocRef);
             if (itemSnap.exists()) {
                 const itemData = itemSnap.data() as InventoryItem;
@@ -212,7 +225,6 @@ export function useInvoices() {
                     });
                 }
             }
-            batch.update(itemDocRef, { quantity: increment(-lineItem.quantity) });
         }
       }
       
@@ -345,10 +357,20 @@ export function useInvoices() {
         batch.update(invoiceDocRef, { status: 'Cancelled' });
 
         invoiceToCancel.lineItems.forEach(lineItem => {
-        if (lineItem.inventoryItemId) {
-            const itemDocRef = doc(db, INVENTORY_COLLECTION, lineItem.inventoryItemId);
-            batch.update(itemDocRef, { quantity: increment(lineItem.quantity) });
-        }
+            if (lineItem.inventoryItemId && lineItem.type === 'product') {
+                const itemDocRef = doc(db, INVENTORY_COLLECTION, lineItem.inventoryItemId);
+                batch.update(itemDocRef, { quantity: increment(lineItem.quantity) });
+
+                const movementRef = doc(collection(db, STOCK_MOVEMENTS_COLLECTION));
+                batch.set(movementRef, {
+                    inventoryItemId: lineItem.inventoryItemId,
+                    type: 'cancellation',
+                    quantity: lineItem.quantity,
+                    referenceId: id,
+                    createdAt: serverTimestamp(),
+                    createdByName: user.username,
+                });
+            }
         });
 
         const message = `${user.username} cancelled invoice ${id}.`;

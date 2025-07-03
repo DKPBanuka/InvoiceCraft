@@ -133,3 +133,15 @@ export interface Message {
   text: string;
   createdAt: any; // server timestamp
 }
+
+export type StockMovementType = 'addition' | 'sale' | 'cancellation' | 'return' | 'adjustment';
+
+export interface StockMovement {
+  id: string;
+  inventoryItemId: string;
+  type: StockMovementType;
+  quantity: number;
+  createdAt: string; // ISO string
+  referenceId?: string; // e.g., Invoice ID, Return ID, or a note like "Initial Stock"
+  createdByName: string;
+}
